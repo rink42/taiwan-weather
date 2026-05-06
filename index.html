@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台灣天氣</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 class="logo">🌤 台灣天氣</h1>
+      <div class="header-right">
+        <select id="savedSelect" class="county-select hidden"></select>
+        <select id="countySelect" class="county-select"></select>
+        <select id="districtSelect" class="county-select hidden"></select>
+        <button id="saveBtn" class="save-btn hidden" title="儲存此地點">＋</button>
+        <span id="updateTime" class="update-time"></span>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- API Key 提示（未設定時顯示） -->
+      <div id="apiKeyNotice" class="api-key-notice hidden">
+        <p>⚠️ 請在 <code>app.js</code> 頂部填入您的中央氣象署 API Key。</p>
+        <p>申請網址：<a href="https://opendata.cwa.gov.tw/user/authkey" target="_blank">opendata.cwa.gov.tw</a></p>
+      </div>
+
+      <!-- 載入中 -->
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>載入天氣資料中…</p>
+      </div>
+
+      <!-- 錯誤訊息 -->
+      <div id="errorMsg" class="error-msg hidden"></div>
+
+      <!-- 當前天氣 -->
+      <section id="currentWeather" class="current-weather card hidden">
+        <div class="current-main">
+          <div class="current-icon" id="currentIcon"></div>
+          <div class="current-temp-block">
+            <div class="current-temp" id="currentTemp"></div>
+            <div class="current-desc" id="currentDesc"></div>
+          </div>
+        </div>
+        <div class="current-details">
+          <div class="detail-item">
+            <span class="detail-label">體感</span>
+            <span class="detail-value" id="currentAT"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">濕度</span>
+            <span class="detail-value" id="currentRH"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">風速</span>
+            <span class="detail-value" id="currentWS"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">降雨</span>
+            <span class="detail-value" id="currentPoP"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 逐小時預報（今日或選定日） -->
+      <section id="hourlySection" class="hourly-section hidden">
+        <h2 class="section-title" id="hourlyTitle">今日逐時預報</h2>
+        <div class="hourly-scroll">
+          <div id="hourlyList" class="hourly-list"></div>
+        </div>
+      </section>
+
+      <!-- 7 天預報 -->
+      <section id="dailySection" class="daily-section hidden">
+        <h2 class="section-title">七日預報</h2>
+        <div id="dailyList" class="daily-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="icons.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
