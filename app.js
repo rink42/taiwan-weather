@@ -333,11 +333,17 @@ function getDayHours(dayIdx) {
   return allHourly.filter(h => h.startTime.startsWith(date));
 }
 
-// 從現在起往後取 24 筆（不夠則跨隔天自動補上）
+// 從現在的「下一筆」起取 24 筆（上方卡片已顯示當前，不重複）
 function getNext24Hours() {
-  const curr  = findCurrentSlot(allHourly);
-  const start = allHourly.findIndex(h => h.startTime === curr.startTime);
-  return allHourly.slice(start < 0 ? 0 : start, (start < 0 ? 0 : start) + 24);
+  const curr = findCurrentSlot(allHourly);
+  const idx  = allHourly.findIndex(h => h.startTime === curr.startTime);
+
+  // 判斷 curr 是否為真正的「過去/現在」slot，是則跳過它從下一筆開始
+  const pad = n => String(n).padStart(2, '0');
+  const d = new Date();
+  const nowStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+  const start = (idx >= 0 && curr.startTime <= nowStr) ? idx + 1 : (idx < 0 ? 0 : idx);
+  return allHourly.slice(start, start + 24);
 }
 
 function renderCurrentWeather(h) {
@@ -354,45 +360,19 @@ function renderCurrentWeather(h) {
 function renderHourlyForecast(hours, title) {
   hourlyTitle.textContent = title || '逐時預報';
 
-  // 找出對應現在時間的 slot（僅限今天）
-  let nowIdx = -1;
-  if (selectedDayIndex === 0) {
-    const pad = n => String(n).padStart(2, '0');
-    const d = new Date();
-    const nowStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-    for (let i = 0; i < hours.length; i++) {
-      if (hours[i].startTime <= nowStr) nowIdx = i;
-      else break;
-    }
-    // API 資料若全在未來（模型更新截止點之後），第一筆也標為現在
-    if (nowIdx === -1 && hours.length > 0) nowIdx = 0;
-  }
-
-  $('hourlyList').innerHTML = hours.map((h, i) => {
+  $('hourlyList').innerHTML = hours.map(h => {
     const time    = h.startTime.slice(11, 16);
-    const isNow   = i === nowIdx;
     const dateObj = new Date(h.startTime.replace(' ', 'T'));
     const dow     = `(${DOW[dateObj.getDay()]})`;
     return `
-      <div class="hourly-item${isNow ? ' now' : ''}">
+      <div class="hourly-item">
         <span class="hourly-dow">${dow}</span>
-        <span class="hourly-time">${isNow ? '現在' : time}</span>
+        <span class="hourly-time">${time}</span>
         <span class="hourly-icon">${wi(h.wx, 36)}</span>
         <span class="hourly-temp">${h.t !== '—' ? h.t + '°' : '—'}</span>
         <span class="hourly-pop">${h.pop !== '—' ? '💧' + h.pop + '%' : ''}</span>
       </div>`;
   }).join('');
-
-  // 自動捲動到「現在」的位置
-  if (nowIdx > 1) {
-    requestAnimationFrame(() => {
-      const scroll = $('hourlyList').parentElement;
-      const items  = $('hourlyList').querySelectorAll('.hourly-item');
-      if (items[nowIdx]) {
-        scroll.scrollTo({ left: items[nowIdx].offsetLeft - 16, behavior: 'smooth' });
-      }
-    });
-  }
 }
 
 function renderDailyForecast(days) {
