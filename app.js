@@ -296,7 +296,7 @@ function geoLocate() {
       showError(msgs[err.code] || '定位失敗，請手動選擇縣市');
       restore();
     },
-    { timeout: 10000, maximumAge: 60000 }
+    { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
   );
 }
 
