@@ -161,7 +161,7 @@ function renderDistrict(districtName) {
   selectedDayIndex = 0;
 
   renderCurrentWeather(findCurrentSlot(allHourly));
-  renderHourlyForecast(getDayHours(0), '今日逐時預報');
+  renderHourlyForecast(getNext24Hours(), '未來 24 小時預報');
   renderDailyForecast(allDaily);
 
   $('updateTime').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
@@ -319,6 +319,13 @@ function getDayHours(dayIdx) {
   return allHourly.filter(h => h.startTime.startsWith(date));
 }
 
+// 從現在起往後取 24 筆（不夠則跨隔天自動補上）
+function getNext24Hours() {
+  const curr  = findCurrentSlot(allHourly);
+  const start = allHourly.findIndex(h => h.startTime === curr.startTime);
+  return allHourly.slice(start < 0 ? 0 : start, (start < 0 ? 0 : start) + 24);
+}
+
 function renderCurrentWeather(h) {
   if (!h) return;
   $('currentIcon').innerHTML = wi(h.wx, 88);
@@ -400,11 +407,13 @@ function renderDailyForecast(days) {
     el.addEventListener('click', () => {
       const idx = Number(el.dataset.idx);
       selectedDayIndex = idx;
-      const day = allDaily[idx];
-      const hours = getDayHours(idx);
+      const day     = allDaily[idx];
       const dateObj = new Date(day.date + 'T00:00:00');
       const isToday = day.date === new Date().toISOString().slice(0, 10);
-      const label = isToday ? '今日逐時預報' : `週${DOW[dateObj.getDay()]} ${dateObj.getMonth()+1}/${dateObj.getDate()} 逐時預報`;
+      const hours   = isToday ? getNext24Hours() : getDayHours(idx);
+      const label   = isToday
+        ? '未來 24 小時預報'
+        : `週${DOW[dateObj.getDay()]} ${dateObj.getMonth()+1}/${dateObj.getDate()} 逐時預報`;
 
       renderHourlyForecast(hours, label);
       renderDailyForecast(allDaily);  // re-render to update active state
