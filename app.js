@@ -57,7 +57,7 @@ function init() {
   districtSelect.addEventListener('change', () => renderDistrict(districtSelect.value));
 
   // 定位按鈕（手動觸發，失敗時顯示錯誤）
-  geoBtn.addEventListener('click', () => geoLocate({ silent: false }));
+  geoBtn.addEventListener('click', () => geoLocate({ silent: false, highAccuracy: true }));
 
   // 儲存按鈕
   saveBtn.addEventListener('click', () => {
@@ -246,7 +246,9 @@ function findCurrentSlot(hourlyList) {
 }
 
 // ── GPS 定位 ─────────────────────────────────────────────────────────
-function geoLocate({ silent = false } = {}) {
+// silent: 失敗時不顯示錯誤（啟動自動定位用）
+// highAccuracy: 啟用高精度 GPS（手動按鈕用）
+function geoLocate({ silent = false, highAccuracy = false } = {}) {
   if (!navigator.geolocation) {
     if (!silent) showError('您的瀏覽器不支援定位功能，請手動選擇縣市');
     else loadCounty(COUNTIES[0]);
@@ -303,7 +305,11 @@ function geoLocate({ silent = false } = {}) {
       }
       restore();
     },
-    { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
+    {
+      enableHighAccuracy: highAccuracy,
+      maximumAge:         highAccuracy ? 0      : 60000,
+      timeout:            highAccuracy ? 15000  : 10000,
+    }
   );
 }
 
