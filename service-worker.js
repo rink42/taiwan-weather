@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_VER = 'tw-weather-v4';
+const CACHE_VER = 'tw-weather-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -36,8 +36,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // CWA API → Network-Only（天氣資料必須即時）
-  if (url.includes('opendata.cwa.gov.tw')) {
+  // CWA / NLSC API → Network-Only（天氣與定位資料必須即時）
+  if (url.includes('opendata.cwa.gov.tw') || url.includes('api.nlsc.gov.tw')) {
     event.respondWith(fetch(event.request));
     return;
   }

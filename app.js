@@ -263,19 +263,19 @@ function geoLocate() {
   navigator.geolocation.getCurrentPosition(
     async pos => {
       try {
-        const { latitude, longitude } = pos.coords;
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=zh-TW`;
+        const { latitude: lat, longitude: lon } = pos.coords;
+        // 使用內政部國土測繪中心官方 API，行政區邊界與政府資料一致
+        const url = `https://api.nlsc.gov.tw/other/TownVillagePointQuery/${lon}/${lat}/4326`;
         const res  = await fetch(url);
-        const data = await res.json();
-        const addr = data.address || {};
+        const text = await res.text();
+        const xml  = new DOMParser().parseFromString(text, 'text/xml');
 
-        // 縣市（正規化 台→臺）
-        let county = (addr.city || addr.county || addr.state || '').replace(/^台/, '臺');
-        // 鄉鎮市區
-        let district = addr.city_district || addr.town || addr.quarter || '';
+        const get      = tag => xml.querySelector(tag)?.textContent?.trim() || '';
+        const county   = get('COUNTYNAME');   // e.g. 臺北市
+        const district = get('TOWNNAME');     // e.g. 萬華區
 
-        if (!COUNTY_DATASET[county]) {
-          showError(`無法識別您的縣市（${county || '未知'}），請手動選擇`);
+        if (!county || !COUNTY_DATASET[county]) {
+          showError(`無法識別您的位置（${county || '未知縣市'}），請手動選擇`);
           return;
         }
 
