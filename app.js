@@ -7,14 +7,19 @@ const API_BASE = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore';
 
 // 各縣市對應的鄉鎮市區天氣預報 dataset ID（每 4 個 ID 一組，取第一個有效 ID）
 const COUNTY_DATASET = {
-  '宜蘭縣': 'F-D0047-001', '桃園市': 'F-D0047-005', '新竹縣': 'F-D0047-009',
-  '苗栗縣': 'F-D0047-013', '彰化縣': 'F-D0047-017', '南投縣': 'F-D0047-021',
-  '雲林縣': 'F-D0047-025', '嘉義縣': 'F-D0047-029', '屏東縣': 'F-D0047-033',
-  '臺東縣': 'F-D0047-037', '花蓮縣': 'F-D0047-041', '澎湖縣': 'F-D0047-045',
-  '基隆市': 'F-D0047-049', '新竹市': 'F-D0047-053', '嘉義市': 'F-D0047-057',
-  '臺北市': 'F-D0047-061', '高雄市': 'F-D0047-065', '新北市': 'F-D0047-069',
-  '臺中市': 'F-D0047-073', '臺南市': 'F-D0047-077', '連江縣': 'F-D0047-081',
-  '金門縣': 'F-D0047-085',
+  // 北部
+  '基隆市': 'F-D0047-049', '臺北市': 'F-D0047-061', '新北市': 'F-D0047-069',
+  '桃園市': 'F-D0047-005', '新竹市': 'F-D0047-053', '新竹縣': 'F-D0047-009',
+  // 中部
+  '苗栗縣': 'F-D0047-013', '臺中市': 'F-D0047-073', '彰化縣': 'F-D0047-017',
+  '南投縣': 'F-D0047-021', '雲林縣': 'F-D0047-025',
+  // 南部
+  '嘉義縣': 'F-D0047-029', '嘉義市': 'F-D0047-057', '臺南市': 'F-D0047-077',
+  '高雄市': 'F-D0047-065', '屏東縣': 'F-D0047-033',
+  // 東部
+  '宜蘭縣': 'F-D0047-001', '花蓮縣': 'F-D0047-041', '臺東縣': 'F-D0047-037',
+  // 離島
+  '澎湖縣': 'F-D0047-045', '金門縣': 'F-D0047-085', '連江縣': 'F-D0047-081',
 };
 
 const COUNTIES = Object.keys(COUNTY_DATASET);
@@ -28,6 +33,7 @@ let allDaily  = [];
 let selectedDayIndex = 0;
 let cachedCountyLocations = null;
 let savedLocations = JSON.parse(localStorage.getItem('tw-weather-saved') || '[]');
+let lastLocation   = JSON.parse(localStorage.getItem('tw-weather-last')  || 'null');
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -94,8 +100,13 @@ function init() {
     return;
   }
 
-  // 啟動時自動定位，失敗則靜默載入預設縣市
-  geoLocate({ silent: true });
+  // 有上次瀏覽地點就直接載入，第一次使用才自動定位
+  if (lastLocation) {
+    countySelect.value = lastLocation.county;
+    loadCounty(lastLocation.county, lastLocation.district);
+  } else {
+    geoLocate({ silent: true });
+  }
 }
 
 // ── Fetch county → populate district dropdown ────────────────────────
@@ -169,6 +180,9 @@ function renderDistrict(districtName) {
   showLoading(false);
   saveBtn.classList.remove('hidden');
   updateSaveBtn();
+  // 記憶最後瀏覽的地點
+  lastLocation = { county: countySelect.value, district: districtName };
+  localStorage.setItem('tw-weather-last', JSON.stringify(lastLocation));
 }
 
 function parseLocation(location) {
