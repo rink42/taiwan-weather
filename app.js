@@ -56,8 +56,8 @@ function init() {
   countySelect.addEventListener('change', () => loadCounty(countySelect.value));
   districtSelect.addEventListener('change', () => renderDistrict(districtSelect.value));
 
-  // 定位按鈕
-  geoBtn.addEventListener('click', geoLocate);
+  // 定位按鈕（手動觸發，失敗時顯示錯誤）
+  geoBtn.addEventListener('click', () => geoLocate({ silent: false }));
 
   // 儲存按鈕
   saveBtn.addEventListener('click', () => {
@@ -94,8 +94,8 @@ function init() {
     return;
   }
 
-  // 啟動時載入預設縣市；使用者可按 📍 按鈕手動定位
-  loadCounty(COUNTIES[0]);
+  // 啟動時自動定位，失敗則靜默載入預設縣市
+  geoLocate({ silent: true });
 }
 
 // ── Fetch county → populate district dropdown ────────────────────────
@@ -246,9 +246,10 @@ function findCurrentSlot(hourlyList) {
 }
 
 // ── GPS 定位 ─────────────────────────────────────────────────────────
-function geoLocate() {
+function geoLocate({ silent = false } = {}) {
   if (!navigator.geolocation) {
-    showError('您的瀏覽器不支援定位功能，請手動選擇縣市');
+    if (!silent) showError('您的瀏覽器不支援定位功能，請手動選擇縣市');
+    else loadCounty(COUNTIES[0]);
     return;
   }
 
@@ -275,25 +276,31 @@ function geoLocate() {
         const district = get('townName');   // e.g. 萬華區
 
         if (!county || !COUNTY_DATASET[county]) {
-          showError(`無法識別您的位置（${county || '未知縣市'}），請手動選擇`);
+          if (!silent) showError(`無法識別您的位置（${county || '未知縣市'}），請手動選擇`);
+          else loadCounty(COUNTIES[0]);
           return;
         }
 
         countySelect.value = county;
         await loadCounty(county, district);
       } catch (err) {
-        showError('定位解析失敗，請手動選擇縣市');
+        if (!silent) showError('定位解析失敗，請手動選擇縣市');
+        else loadCounty(COUNTIES[0]);
       } finally {
         restore();
       }
     },
     err => {
-      const msgs = {
-        1: '位置權限被拒絕，請在瀏覽器設定中允許定位',
-        2: '無法取得位置資訊',
-        3: '定位逾時，請再試一次',
-      };
-      showError(msgs[err.code] || '定位失敗，請手動選擇縣市');
+      if (!silent) {
+        const msgs = {
+          1: '位置權限被拒絕，請在瀏覽器設定中允許定位',
+          2: '無法取得位置資訊',
+          3: '定位逾時，請再試一次',
+        };
+        showError(msgs[err.code] || '定位失敗，請手動選擇縣市');
+      } else {
+        loadCounty(COUNTIES[0]);
+      }
       restore();
     },
     { timeout: 15000, maximumAge: 0, enableHighAccuracy: true }
