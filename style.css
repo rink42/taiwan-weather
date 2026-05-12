@@ -106,6 +106,33 @@ body {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.geo-btn {
+  background: rgba(124, 131, 253, 0.18);
+  border: 1px solid rgba(124, 131, 253, 0.5);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.2s, border-color 0.2s;
+  backdrop-filter: blur(8px);
+  outline: none;
+  white-space: nowrap;
+}
+
+.geo-btn:hover {
+  background: rgba(124, 131, 253, 0.32);
+}
+
+.geo-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .save-btn.is-saved {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.5);

@@ -94,8 +94,8 @@ function init() {
     return;
   }
 
-  // 啟動時自動定位；若瀏覽器不支援或使用者拒絕，則載入預設縣市
-  geoLocate();
+  // 啟動時載入預設縣市；使用者可按 📍 按鈕手動定位
+  loadCounty(COUNTIES[0]);
 }
 
 // ── Fetch county → populate district dropdown ────────────────────────
@@ -246,28 +246,18 @@ function findCurrentSlot(hourlyList) {
 }
 
 // ── GPS 定位 ─────────────────────────────────────────────────────────
-async function geoLocate() {
+function geoLocate() {
   if (!navigator.geolocation) {
-    // 瀏覽器不支援，直接載入預設
-    loadCounty(COUNTIES[0]);
+    showError('您的瀏覽器不支援定位功能，請手動選擇縣市');
     return;
   }
 
   geoBtn.textContent = '⏳';
   geoBtn.disabled = true;
-  showLoading(true);
-  hideError();
-  hideSections();
-  districtSelect.classList.add('hidden');
-  saveBtn.classList.add('hidden');
 
-  const onError = msg => {
-    showError(msg);
-    showLoading(false);
-    geoBtn.textContent = '📍';
+  const restore = () => {
+    geoBtn.textContent = '📍 定位';
     geoBtn.disabled = false;
-    // 定位失敗時，退回預設縣市
-    loadCounty(COUNTIES[0]);
   };
 
   navigator.geolocation.getCurrentPosition(
@@ -275,7 +265,7 @@ async function geoLocate() {
       try {
         const { latitude, longitude } = pos.coords;
         const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=zh-TW`;
-        const res  = await fetch(url, { headers: { 'User-Agent': 'TaiwanWeatherApp/1.0' } });
+        const res  = await fetch(url);
         const data = await res.json();
         const addr = data.address || {};
 
@@ -285,28 +275,28 @@ async function geoLocate() {
         let district = addr.city_district || addr.town || addr.quarter || '';
 
         if (!COUNTY_DATASET[county]) {
-          // 無法識別，退回預設，不顯示錯誤
-          loadCounty(COUNTIES[0]);
+          showError(`無法識別您的縣市（${county || '未知'}），請手動選擇`);
           return;
         }
 
         countySelect.value = county;
         await loadCounty(county, district);
-      } catch {
-        loadCounty(COUNTIES[0]);
+      } catch (err) {
+        showError('定位解析失敗，請手動選擇縣市');
       } finally {
-        geoBtn.textContent = '📍';
-        geoBtn.disabled = false;
+        restore();
       }
     },
-    _err => {
-      // 使用者拒絕或逾時，靜默退回預設
-      geoBtn.textContent = '📍';
-      geoBtn.disabled = false;
-      loadCounty(COUNTIES[0]);
-      showLoading(false);
+    err => {
+      const msgs = {
+        1: '位置權限被拒絕，請在瀏覽器設定中允許定位',
+        2: '無法取得位置資訊',
+        3: '定位逾時，請再試一次',
+      };
+      showError(msgs[err.code] || '定位失敗，請手動選擇縣市');
+      restore();
     },
-    { timeout: 8000, maximumAge: 300000 }
+    { timeout: 10000, maximumAge: 60000 }
   );
 }
 
