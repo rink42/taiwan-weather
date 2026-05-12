@@ -34,6 +34,7 @@ const $ = id => document.getElementById(id);
 const countySelect   = $('countySelect');
 const districtSelect = $('districtSelect');
 const savedSelect    = $('savedSelect');
+const geoBtn         = $('geoBtn');
 const saveBtn        = $('saveBtn');
 const apiKeyNotice   = $('apiKeyNotice');
 const loadingEl      = $('loading');
@@ -54,6 +55,9 @@ function init() {
 
   countySelect.addEventListener('change', () => loadCounty(countySelect.value));
   districtSelect.addEventListener('change', () => renderDistrict(districtSelect.value));
+
+  // 定位按鈕
+  geoBtn.addEventListener('click', geoLocate);
 
   // 儲存按鈕
   saveBtn.addEventListener('click', () => {
@@ -90,7 +94,8 @@ function init() {
     return;
   }
 
-  loadCounty(COUNTIES[0]);
+  // 啟動時自動定位；若瀏覽器不支援或使用者拒絕，則載入預設縣市
+  geoLocate();
 }
 
 // ── Fetch county → populate district dropdown ────────────────────────
@@ -122,8 +127,18 @@ async function loadCounty(countyName, targetDistrict) {
     });
     districtSelect.classList.remove('hidden');
 
-    // 若有指定行政區（來自記憶位置），切換過去
-    if (targetDistrict) districtSelect.value = targetDistrict;
+    // 若有指定行政區（來自記憶位置或定位），切換過去（支援模糊匹配）
+    if (targetDistrict) {
+      const exact = locations.find(l => l.LocationName === targetDistrict);
+      if (exact) {
+        districtSelect.value = exact.LocationName;
+      } else {
+        const fuzzy = locations.find(l =>
+          l.LocationName.includes(targetDistrict) || targetDistrict.includes(l.LocationName)
+        );
+        if (fuzzy) districtSelect.value = fuzzy.LocationName;
+      }
+    }
 
     renderDistrict(districtSelect.value);
   } catch (err) {
@@ -145,7 +160,7 @@ function renderDistrict(districtName) {
   allDaily  = parsed.dailyList;
   selectedDayIndex = 0;
 
-  renderCurrentWeather(allHourly[0]);
+  renderCurrentWeather(findCurrentSlot(allHourly));
   renderHourlyForecast(getDayHours(0), '今日逐時預報');
   renderDailyForecast(allDaily);
 
@@ -217,6 +232,84 @@ function parseLocation(location) {
   return { hourlyList, dailyList };
 }
 
+// ── 找出最接近當前時間的逐時 slot ────────────────────────────────────
+function findCurrentSlot(hourlyList) {
+  const pad = n => String(n).padStart(2, '0');
+  const d = new Date();
+  const nowStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+  let best = hourlyList[0];
+  for (const h of hourlyList) {
+    if (h.startTime <= nowStr) best = h;
+    else break;
+  }
+  return best;
+}
+
+// ── GPS 定位 ─────────────────────────────────────────────────────────
+async function geoLocate() {
+  if (!navigator.geolocation) {
+    // 瀏覽器不支援，直接載入預設
+    loadCounty(COUNTIES[0]);
+    return;
+  }
+
+  geoBtn.textContent = '⏳';
+  geoBtn.disabled = true;
+  showLoading(true);
+  hideError();
+  hideSections();
+  districtSelect.classList.add('hidden');
+  saveBtn.classList.add('hidden');
+
+  const onError = msg => {
+    showError(msg);
+    showLoading(false);
+    geoBtn.textContent = '📍';
+    geoBtn.disabled = false;
+    // 定位失敗時，退回預設縣市
+    loadCounty(COUNTIES[0]);
+  };
+
+  navigator.geolocation.getCurrentPosition(
+    async pos => {
+      try {
+        const { latitude, longitude } = pos.coords;
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=zh-TW`;
+        const res  = await fetch(url, { headers: { 'User-Agent': 'TaiwanWeatherApp/1.0' } });
+        const data = await res.json();
+        const addr = data.address || {};
+
+        // 縣市（正規化 台→臺）
+        let county = (addr.city || addr.county || addr.state || '').replace(/^台/, '臺');
+        // 鄉鎮市區
+        let district = addr.city_district || addr.town || addr.quarter || '';
+
+        if (!COUNTY_DATASET[county]) {
+          // 無法識別，退回預設，不顯示錯誤
+          loadCounty(COUNTIES[0]);
+          return;
+        }
+
+        countySelect.value = county;
+        await loadCounty(county, district);
+      } catch {
+        loadCounty(COUNTIES[0]);
+      } finally {
+        geoBtn.textContent = '📍';
+        geoBtn.disabled = false;
+      }
+    },
+    _err => {
+      // 使用者拒絕或逾時，靜默退回預設
+      geoBtn.textContent = '📍';
+      geoBtn.disabled = false;
+      loadCounty(COUNTIES[0]);
+      showLoading(false);
+    },
+    { timeout: 8000, maximumAge: 300000 }
+  );
+}
+
 // ── Render helpers ───────────────────────────────────────────────────
 function getDayHours(dayIdx) {
   const date = allDaily[dayIdx]?.date;
@@ -236,11 +329,22 @@ function renderCurrentWeather(h) {
 
 function renderHourlyForecast(hours, title) {
   hourlyTitle.textContent = title || '逐時預報';
-  const nowStr = hours[0]?.startTime || '';
+
+  // 找出對應現在時間的 slot（僅限今天）
+  let nowIdx = -1;
+  if (selectedDayIndex === 0) {
+    const pad = n => String(n).padStart(2, '0');
+    const d = new Date();
+    const nowStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+    for (let i = 0; i < hours.length; i++) {
+      if (hours[i].startTime <= nowStr) nowIdx = i;
+      else break;
+    }
+  }
 
   $('hourlyList').innerHTML = hours.map((h, i) => {
     const time = h.startTime.slice(11, 16);
-    const isNow = i === 0 && selectedDayIndex === 0;
+    const isNow = i === nowIdx;
     return `
       <div class="hourly-item${isNow ? ' now' : ''}">
         <span class="hourly-time">${isNow ? '現在' : time}</span>
@@ -249,6 +353,17 @@ function renderHourlyForecast(hours, title) {
         <span class="hourly-pop">${h.pop !== '—' ? '💧' + h.pop + '%' : ''}</span>
       </div>`;
   }).join('');
+
+  // 自動捲動到「現在」的位置
+  if (nowIdx > 1) {
+    requestAnimationFrame(() => {
+      const scroll = $('hourlyList').parentElement;
+      const items  = $('hourlyList').querySelectorAll('.hourly-item');
+      if (items[nowIdx]) {
+        scroll.scrollTo({ left: items[nowIdx].offsetLeft - 16, behavior: 'smooth' });
+      }
+    });
+  }
 }
 
 function renderDailyForecast(days) {
