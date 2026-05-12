@@ -271,8 +271,8 @@ function geoLocate() {
         const xml  = new DOMParser().parseFromString(text, 'text/xml');
 
         const get      = tag => xml.querySelector(tag)?.textContent?.trim() || '';
-        const county   = get('COUNTYNAME');   // e.g. 臺北市
-        const district = get('TOWNNAME');     // e.g. 萬華區
+        const county   = get('ctyName');    // e.g. 臺北市
+        const district = get('townName');   // e.g. 萬華區
 
         if (!county || !COUNTY_DATASET[county]) {
           showError(`無法識別您的位置（${county || '未知縣市'}），請手動選擇`);
