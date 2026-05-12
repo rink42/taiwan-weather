@@ -364,13 +364,18 @@ function renderHourlyForecast(hours, title) {
       if (hours[i].startTime <= nowStr) nowIdx = i;
       else break;
     }
+    // API 資料若全在未來（模型更新截止點之後），第一筆也標為現在
+    if (nowIdx === -1 && hours.length > 0) nowIdx = 0;
   }
 
   $('hourlyList').innerHTML = hours.map((h, i) => {
-    const time = h.startTime.slice(11, 16);
-    const isNow = i === nowIdx;
+    const time    = h.startTime.slice(11, 16);
+    const isNow   = i === nowIdx;
+    const dateObj = new Date(h.startTime.replace(' ', 'T'));
+    const dow     = `(${DOW[dateObj.getDay()]})`;
     return `
       <div class="hourly-item${isNow ? ' now' : ''}">
+        <span class="hourly-dow">${dow}</span>
         <span class="hourly-time">${isNow ? '現在' : time}</span>
         <span class="hourly-icon">${wi(h.wx, 36)}</span>
         <span class="hourly-temp">${h.t !== '—' ? h.t + '°' : '—'}</span>

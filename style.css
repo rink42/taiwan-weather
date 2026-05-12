@@ -287,9 +287,16 @@ body {
   border-color: var(--accent);
 }
 
+.hourly-dow {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
 .hourly-time {
   font-size: 0.75rem;
   color: var(--text-dim);
+  margin-top: -2px;
 }
 
 .hourly-icon {
