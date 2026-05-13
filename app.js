@@ -32,8 +32,45 @@ let allHourly = [];
 let allDaily  = [];
 let selectedDayIndex = 0;
 let cachedCountyLocations = null;
+let isOfflineMode = false;
 let savedLocations = JSON.parse(localStorage.getItem('tw-weather-saved') || '[]');
 let lastLocation   = JSON.parse(localStorage.getItem('tw-weather-last')  || 'null');
+
+// ── localStorage 快取輔助 ────────────────────────────────────────────
+function saveDistrictList(countyName, names) {
+  try { localStorage.setItem(`tw-districts-${countyName}`, JSON.stringify(names)); } catch {}
+}
+
+function getDistrictList(countyName) {
+  try {
+    const raw = localStorage.getItem(`tw-districts-${countyName}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveWeatherCache(countyName, districtName, hourlyList, dailyList) {
+  try {
+    localStorage.setItem(
+      `tw-data-${countyName}-${districtName}`,
+      JSON.stringify({ hourlyList, dailyList, cachedAt: new Date().toISOString() })
+    );
+  } catch {}
+}
+
+function getWeatherCache(countyName, districtName) {
+  try {
+    const raw = localStorage.getItem(`tw-data-${countyName}-${districtName}`);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data?.hourlyList?.length) return null;
+    // 快取的最新 slot 必須在 24 小時以內，否則視為過期
+    const currSlot = findCurrentSlot(data.hourlyList);
+    if (!currSlot) return null;
+    const slotTime = new Date(currSlot.startTime.replace(' ', 'T'));
+    if (Date.now() - slotTime > 24 * 60 * 60 * 1000) return null;
+    return data;
+  } catch { return null; }
+}
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -60,7 +97,13 @@ function init() {
   });
 
   countySelect.addEventListener('change', () => loadCounty(countySelect.value));
-  districtSelect.addEventListener('change', () => renderDistrict(districtSelect.value));
+  districtSelect.addEventListener('change', () => {
+    if (isOfflineMode) {
+      renderDistrictFromCache(districtSelect.value, countySelect.value);
+    } else {
+      renderDistrict(districtSelect.value);
+    }
+  });
 
   // 定位按鈕（手動觸發，失敗時顯示錯誤）
   geoBtn.addEventListener('click', () => geoLocate({ silent: false, highAccuracy: true }));
@@ -128,6 +171,10 @@ async function loadCounty(countyName, targetDistrict) {
     if (!locations?.length) throw new Error('找不到行政區資料');
 
     cachedCountyLocations = locations;
+    isOfflineMode = false;
+
+    // 將行政區名稱列表存入快取，供離線時還原下拉選單
+    saveDistrictList(countyName, locations.map(l => l.LocationName));
 
     districtSelect.innerHTML = '';
     locations.forEach(loc => {
@@ -153,8 +200,35 @@ async function loadCounty(countyName, targetDistrict) {
 
     renderDistrict(districtSelect.value);
   } catch (err) {
-    showError(err.message);
-    showLoading(false);
+    // CWA API 失敗 → 嘗試 localStorage 快取
+    const cachedNames = getDistrictList(countyName);
+    const fallbackDistrict =
+      targetDistrict ||
+      (lastLocation?.county === countyName ? lastLocation.district : null);
+
+    if (cachedNames) {
+      isOfflineMode = true;
+      cachedCountyLocations = null;
+      districtSelect.innerHTML = '';
+      cachedNames.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        districtSelect.appendChild(opt);
+      });
+      districtSelect.classList.remove('hidden');
+
+      if (fallbackDistrict) {
+        const match = cachedNames.find(n => n === fallbackDistrict) ||
+                      cachedNames.find(n => n.includes(fallbackDistrict) || fallbackDistrict.includes(n));
+        if (match) districtSelect.value = match;
+      }
+
+      renderDistrictFromCache(districtSelect.value, countyName);
+    } else {
+      showError('CWA API 伺服器目前無法連線，且無可用的快取資料');
+      showLoading(false);
+    }
   }
 }
 
@@ -171,6 +245,9 @@ function renderDistrict(districtName) {
   allDaily  = parsed.dailyList;
   selectedDayIndex = 0;
 
+  // 存入快取供下次 API 失敗時備用
+  saveWeatherCache(countySelect.value, districtName, allHourly, allDaily);
+
   renderCurrentWeather(findCurrentSlot(allHourly));
   renderHourlyForecast(getNext24Hours(), '未來 24 小時預報');
   renderDailyForecast(allDaily);
@@ -182,6 +259,35 @@ function renderDistrict(districtName) {
   updateSaveBtn();
   // 記憶最後瀏覽的地點
   lastLocation = { county: countySelect.value, district: districtName };
+  localStorage.setItem('tw-weather-last', JSON.stringify(lastLocation));
+}
+
+// ── 從 localStorage 快取渲染行政區天氣（API 不可用時） ───────────────
+function renderDistrictFromCache(districtName, countyName, cachedData) {
+  const data = cachedData ?? getWeatherCache(countyName, districtName);
+  if (!data) {
+    showError('CWA API 伺服器目前無法連線，且此行政區無可用的快取資料');
+    showLoading(false);
+    return;
+  }
+
+  allHourly = data.hourlyList;
+  allDaily  = data.dailyList;
+  selectedDayIndex = 0;
+
+  renderCurrentWeather(findCurrentSlot(allHourly));
+  renderHourlyForecast(getNext24Hours(), '未來 24 小時預報');
+  renderDailyForecast(allDaily);
+
+  const t = new Date(data.cachedAt);
+  const hhmm = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+  $('updateTime').textContent = `快取：${hhmm}`;
+  showSections();
+  showLoading(false);
+  saveBtn.classList.remove('hidden');
+  updateSaveBtn();
+
+  lastLocation = { county: countyName, district: districtName };
   localStorage.setItem('tw-weather-last', JSON.stringify(lastLocation));
 }
 
