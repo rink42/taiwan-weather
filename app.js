@@ -32,6 +32,7 @@ let allHourly = [];
 let allDaily  = [];
 let selectedDayIndex = 0;
 let cachedCountyLocations = null;
+let cachedWeeklyLocations = null;   // 1週 dataset（+2 ID），用於七日日預報
 let isOfflineMode = false;
 let savedLocations = JSON.parse(localStorage.getItem('tw-weather-saved') || '[]');
 let lastLocation   = JSON.parse(localStorage.getItem('tw-weather-last')  || 'null');
@@ -162,15 +163,24 @@ async function loadCounty(countyName, targetDistrict) {
 
   try {
     const datasetId = COUNTY_DATASET[countyName];
-    const url = `${API_BASE}/${datasetId}?Authorization=${API_KEY}&format=JSON`;
-    const res  = await fetch(url);
+    // 1週 dataset ID = 3天 dataset ID 數字 + 2（CWA 固定規律）
+    const weeklyNum = parseInt(datasetId.split('-')[2]) + 2;
+    const weeklyId  = `F-D0047-${String(weeklyNum).padStart(3, '0')}`;
+
+    const [res, resW] = await Promise.all([
+      fetch(`${API_BASE}/${datasetId}?Authorization=${API_KEY}&format=JSON`),
+      fetch(`${API_BASE}/${weeklyId}?Authorization=${API_KEY}&format=JSON`),
+    ]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
+
+    const json  = await res.json();
+    const jsonW = resW.ok ? await resW.json() : null;
 
     const locations = json?.records?.Locations?.[0]?.Location;
     if (!locations?.length) throw new Error('找不到行政區資料');
 
     cachedCountyLocations = locations;
+    cachedWeeklyLocations = jsonW?.records?.Locations?.[0]?.Location ?? null;
     isOfflineMode = false;
 
     // 將行政區名稱列表存入快取，供離線時還原下拉選單
@@ -209,6 +219,7 @@ async function loadCounty(countyName, targetDistrict) {
     if (cachedNames) {
       isOfflineMode = true;
       cachedCountyLocations = null;
+      cachedWeeklyLocations = null;
       districtSelect.innerHTML = '';
       cachedNames.forEach(name => {
         const opt = document.createElement('option');
@@ -238,7 +249,8 @@ function renderDistrict(districtName) {
   const location = cachedCountyLocations.find(l => l.LocationName === districtName);
   if (!location) return;
 
-  const parsed = parseLocation(location);
+  const weeklyLoc = cachedWeeklyLocations?.find(l => l.LocationName === districtName) ?? null;
+  const parsed = parseLocation(location, weeklyLoc);
   if (!parsed) { showError('資料解析失敗'); return; }
 
   allHourly = parsed.hourlyList;
@@ -291,7 +303,7 @@ function renderDistrictFromCache(districtName, countyName, cachedData) {
   localStorage.setItem('tw-weather-last', JSON.stringify(lastLocation));
 }
 
-function parseLocation(location) {
+function parseLocation(location, weeklyLocation = null) {
   if (!location) return null;
   const elements = location.WeatherElement || [];
   const byName = {};
@@ -329,38 +341,42 @@ function parseLocation(location) {
   });
 
   // ── 七日日預報 ──────────────────────────────────────────────────────
-  // 優先用 最高溫/最低溫 日元素（覆蓋 7 天），退回逐時彙整
-  const maxTArr   = byName['最高溫'] || [];
-  const minTArr   = byName['最低溫'] || [];
-  const pop12hArr = byName['12小時降雨機率'] || byName['6小時降雨機率'] || [];
-  const wxArr     = byName['天氣現象'] || [];
-
   // 從 Date 物件取本地 YYYY-MM-DD，避免 ISO offset 干擾 slice(0,10)
   const isoDate = d => {
     const p = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
   };
-  // ElementValue[0] 只有一個欄位（例如 {Temperature:"28"} 或 {MaxT:"28"}），取第一個值
+  // ElementValue[0] 只有一個欄位，取第一個值（不必猜欄位名稱）
   const fv = obj => obj ? (Object.values(obj)[0] ?? '—') : '—';
 
   let dailyList;
-  if (maxTArr.length > 0) {
-    // CWA 最高溫/最低溫 日元素，每天一筆 StartTime/EndTime
-    dailyList = maxTArr.map(slot => {
-      const date = isoDate(new Date(slot.StartTime));
 
-      const high = fv(slot.ElementValue?.[0]);
-      const lowSlot = minTArr.find(t => isoDate(new Date(t.StartTime)) === date);
-      const low  = fv(lowSlot?.ElementValue?.[0]);
+  if (weeklyLocation) {
+    // ── 優先路徑：使用 1週 dataset（F-D0047-xxx+2）─────────────────
+    const wEl = weeklyLocation.WeatherElement || [];
+    const wBy = {};
+    wEl.forEach(el => { wBy[el.ElementName] = el.Time; });
 
-      // 天氣現象：取正午區間；找不到就取當天第一個
+    const maxTArr = wBy['最高溫'] || [];
+    const minTArr = wBy['最低溫'] || [];
+    const wxWArr  = wBy['天氣現象'] || [];
+    const popWArr = wBy['12小時降雨機率'] || wBy['6小時降雨機率'] || [];
+
+    // 用最高溫的時間軸當錨點（每天一筆），若無則用天氣現象
+    const anchor = maxTArr.length ? maxTArr : wxWArr;
+    const dateSet = new Set(anchor.map(t => isoDate(new Date(t.StartTime))));
+    const dates = Array.from(dateSet).sort().slice(0, 7);
+
+    dailyList = dates.map(date => {
+      const high = fv(maxTArr.find(t => isoDate(new Date(t.StartTime)) === date)?.ElementValue?.[0]);
+      const low  = fv(minTArr.find(t => isoDate(new Date(t.StartTime)) === date)?.ElementValue?.[0]);
+
       const noon = new Date(`${date}T12:00:00`);
-      const wxSlot = wxArr.find(t => new Date(t.StartTime) <= noon && noon < new Date(t.EndTime))
-                  ?? wxArr.find(t => isoDate(new Date(t.StartTime)) === date);
+      const wxSlot = wxWArr.find(t => new Date(t.StartTime) <= noon && noon < new Date(t.EndTime))
+                  ?? wxWArr.find(t => isoDate(new Date(t.StartTime)) === date);
       const wx = wxSlot?.ElementValue?.[0]?.Weather ?? fv(wxSlot?.ElementValue?.[0]);
 
-      // 降雨機率：當天所有區間取最大值
-      const pops = pop12hArr
+      const pops = popWArr
         .filter(t => isoDate(new Date(t.StartTime)) === date)
         .map(t => Number(fv(t.ElementValue?.[0])))
         .filter(v => !isNaN(v));
@@ -369,7 +385,7 @@ function parseLocation(location) {
       return { date, high, low, pop, wx };
     });
   } else {
-    // 退回：從逐時資料彙整（3-5 天）
+    // ── 退回：從 3-day 逐時資料彙整（3-5 天）────────────────────────
     const dayMap = new Map();
     hourlyList.forEach(h => {
       const dateKey = isoDate(new Date(h.startTime));
