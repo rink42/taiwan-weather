@@ -24,6 +24,29 @@ const COUNTY_DATASET = {
 
 const COUNTIES = Object.keys(COUNTY_DATASET);
 
+// 各縣市中心座標，供 Open-Meteo 查詢
+const COUNTY_COORDS = {
+  '基隆市': [25.13, 121.74], '臺北市': [25.05, 121.55], '新北市': [25.01, 121.46],
+  '桃園市': [24.99, 121.30], '新竹市': [24.80, 120.97], '新竹縣': [24.84, 121.02],
+  '苗栗縣': [24.56, 120.82], '臺中市': [24.15, 120.68], '彰化縣': [24.07, 120.54],
+  '南投縣': [23.96, 120.97], '雲林縣': [23.71, 120.43], '嘉義縣': [23.46, 120.57],
+  '嘉義市': [23.48, 120.45], '臺南市': [23.00, 120.21], '高雄市': [22.63, 120.31],
+  '屏東縣': [22.55, 120.55], '宜蘭縣': [24.70, 121.74], '花蓮縣': [23.99, 121.60],
+  '臺東縣': [22.80, 121.15], '澎湖縣': [23.57, 119.58], '金門縣': [24.43, 118.32],
+  '連江縣': [26.16, 119.96],
+};
+
+// WMO 天氣代碼 → 中文描述（對應 wi() 圖示判斷）
+const WMO_DESC = {
+  0:'晴天', 1:'晴時多雲', 2:'多雲', 3:'陰天',
+  45:'多雲', 48:'多雲',
+  51:'小雨', 53:'小雨', 55:'小雨', 56:'小雨', 57:'小雨',
+  61:'小雨', 63:'陣雨', 65:'大雨', 66:'小雨', 67:'大雨',
+  71:'雪', 73:'雪', 75:'雪', 77:'陰天',
+  80:'陣雨', 81:'陣雨', 82:'大雨',
+  85:'雪', 86:'雪',
+  95:'雷陣雨', 96:'雷陣雨', 99:'雷陣雨',
+};
 
 const DOW = ['日','一','二','三','四','五','六'];
 
@@ -32,6 +55,7 @@ let allHourly = [];
 let allDaily  = [];
 let selectedDayIndex = 0;
 let cachedCountyLocations = null;
+let cachedOpenMeteoDaily  = null;  // Open-Meteo 10天日預報
 let isOfflineMode = false;
 let savedLocations = JSON.parse(localStorage.getItem('tw-weather-saved') || '[]');
 let lastLocation   = JSON.parse(localStorage.getItem('tw-weather-last')  || 'null');
@@ -69,6 +93,22 @@ function getWeatherCache(countyName, districtName) {
     const slotTime = new Date(currSlot.startTime.replace(' ', 'T'));
     if (Date.now() - slotTime > 24 * 60 * 60 * 1000) return null;
     return data;
+  } catch { return null; }
+}
+
+// ── Open-Meteo 日預報解析 ─────────────────────────────────────────────
+function parseOpenMeteoDaily(json) {
+  try {
+    const d = json?.daily;
+    if (!d?.time?.length) return null;
+    return d.time.map((date, i) => ({
+      date,
+      high: d.temperature_2m_max[i]            != null ? Math.round(d.temperature_2m_max[i])            : '—',
+      low:  d.temperature_2m_min[i]            != null ? Math.round(d.temperature_2m_min[i])            : '—',
+      pop:  d.precipitation_probability_max[i] != null ? d.precipitation_probability_max[i]             : '—',
+      wind: d.wind_speed_10m_max[i]            != null ? Math.round(d.wind_speed_10m_max[i])            : '—',
+      wx:   WMO_DESC[d.weather_code[i]] ?? '多雲',
+    }));
   } catch { return null; }
 }
 
@@ -162,16 +202,28 @@ async function loadCounty(countyName, targetDistrict) {
 
   try {
     const datasetId = COUNTY_DATASET[countyName];
-    const url = `${API_BASE}/${datasetId}?Authorization=${API_KEY}&format=JSON`;
-    const res = await fetch(url);
+    const coords    = COUNTY_COORDS[countyName];
+    const omUrl = coords
+      ? `https://api.open-meteo.com/v1/forecast?latitude=${coords[0]}&longitude=${coords[1]}` +
+        `&daily=weather_code,temperature_2m_max,temperature_2m_min,` +
+        `precipitation_probability_max,wind_speed_10m_max` +
+        `&timezone=Asia%2FTaipei&forecast_days=10`
+      : null;
+
+    const [res, resOM] = await Promise.all([
+      fetch(`${API_BASE}/${datasetId}?Authorization=${API_KEY}&format=JSON`),
+      omUrl ? fetch(omUrl) : Promise.resolve(null),
+    ]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const json = await res.json();
+    const json   = await res.json();
+    const jsonOM = (resOM?.ok) ? await resOM.json() : null;
 
     const locations = json?.records?.Locations?.[0]?.Location;
     if (!locations?.length) throw new Error('找不到行政區資料');
 
     cachedCountyLocations = locations;
+    cachedOpenMeteoDaily  = parseOpenMeteoDaily(jsonOM);
     isOfflineMode = false;
 
     // 將行政區名稱列表存入快取，供離線時還原下拉選單
@@ -210,6 +262,7 @@ async function loadCounty(countyName, targetDistrict) {
     if (cachedNames) {
       isOfflineMode = true;
       cachedCountyLocations = null;
+      cachedOpenMeteoDaily  = null;
       districtSelect.innerHTML = '';
       cachedNames.forEach(name => {
         const opt = document.createElement('option');
@@ -243,7 +296,8 @@ function renderDistrict(districtName) {
   if (!parsed) { showError('資料解析失敗'); return; }
 
   allHourly = parsed.hourlyList;
-  allDaily  = parsed.dailyList;
+  // Open-Meteo 提供 10 天日預報（含風速），優先使用；API 失敗時退回 CWA 逐時彙整
+  allDaily  = cachedOpenMeteoDaily ?? parsed.dailyList;
   selectedDayIndex = 0;
 
   // 存入快取供下次 API 失敗時備用
@@ -510,7 +564,10 @@ function renderDailyForecast(days) {
           <span class="temp-sep">/</span>
           <span class="temp-low">${d.low}°</span>
         </div>
-        <div class="daily-pop">${d.pop !== '—' ? '💧' + d.pop + '%' : ''}</div>
+        <div class="daily-extra">
+          <span class="daily-pop">${d.pop !== '—' ? '💧' + d.pop + '%' : ''}</span>
+          <span class="daily-wind">${d.wind != null && d.wind !== '—' ? '💨' + d.wind : ''}</span>
+        </div>
       </div>`;
   }).join('');
 

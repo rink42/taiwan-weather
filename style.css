@@ -331,7 +331,7 @@ body {
 
 .daily-item {
   display: grid;
-  grid-template-columns: 72px 40px 1fr 80px 56px;
+  grid-template-columns: 72px 40px 1fr 80px 60px;
   align-items: center;
   gap: 12px;
   background: var(--glass);
@@ -392,9 +392,22 @@ body {
 .temp-sep  { color: var(--text-dim); font-size: 0.75rem; }
 .temp-low  { color: var(--text-dim); }
 
+.daily-extra {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .daily-pop {
   font-size: 0.78rem;
   color: #93c5fd;
+  text-align: right;
+}
+
+.daily-wind {
+  font-size: 0.72rem;
+  color: #a5f3fc;
   text-align: right;
 }
 
@@ -464,7 +477,7 @@ body {
   }
 
   .daily-item {
-    grid-template-columns: 56px 36px 1fr 72px 48px;
+    grid-template-columns: 56px 36px 1fr 72px 52px;
     gap: 8px;
     padding: 12px;
   }
