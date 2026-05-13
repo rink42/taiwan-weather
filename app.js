@@ -328,26 +328,67 @@ function parseLocation(location) {
     };
   });
 
-  // 依日期分組 → dailyList
-  const dayMap = new Map();
-  hourlyList.forEach(h => {
-    const dateKey = h.startTime.slice(0, 10);
-    if (!dayMap.has(dateKey)) dayMap.set(dateKey, []);
-    dayMap.get(dateKey).push(h);
-  });
+  // ── 七日日預報 ──────────────────────────────────────────────────────
+  // 優先用 最高溫/最低溫 日元素（覆蓋 7 天），退回逐時彙整
+  const maxTArr   = byName['最高溫'] || [];
+  const minTArr   = byName['最低溫'] || [];
+  const pop12hArr = byName['12小時降雨機率'] || byName['6小時降雨機率'] || [];
+  const wxArr     = byName['天氣現象'] || [];
 
-  const dailyList = Array.from(dayMap.entries()).map(([date, hours]) => {
-    const temps  = hours.map(h => Number(h.t)).filter(v => !isNaN(v));
-    const pops   = hours.map(h => Number(h.pop)).filter(v => !isNaN(v));
-    const mainWx = hours[Math.floor(hours.length / 2)]?.wx || hours[0]?.wx || '';
-    return {
-      date,
-      high: temps.length ? Math.max(...temps) : '—',
-      low:  temps.length ? Math.min(...temps) : '—',
-      pop:  pops.length  ? Math.max(...pops)  : '—',
-      wx:   mainWx,
-    };
-  });
+  // 從 Date 物件取本地 YYYY-MM-DD，避免 ISO offset 干擾 slice(0,10)
+  const isoDate = d => {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+  };
+  // ElementValue[0] 只有一個欄位（例如 {Temperature:"28"} 或 {MaxT:"28"}），取第一個值
+  const fv = obj => obj ? (Object.values(obj)[0] ?? '—') : '—';
+
+  let dailyList;
+  if (maxTArr.length > 0) {
+    // CWA 最高溫/最低溫 日元素，每天一筆 StartTime/EndTime
+    dailyList = maxTArr.map(slot => {
+      const date = isoDate(new Date(slot.StartTime));
+
+      const high = fv(slot.ElementValue?.[0]);
+      const lowSlot = minTArr.find(t => isoDate(new Date(t.StartTime)) === date);
+      const low  = fv(lowSlot?.ElementValue?.[0]);
+
+      // 天氣現象：取正午區間；找不到就取當天第一個
+      const noon = new Date(`${date}T12:00:00`);
+      const wxSlot = wxArr.find(t => new Date(t.StartTime) <= noon && noon < new Date(t.EndTime))
+                  ?? wxArr.find(t => isoDate(new Date(t.StartTime)) === date);
+      const wx = wxSlot?.ElementValue?.[0]?.Weather ?? fv(wxSlot?.ElementValue?.[0]);
+
+      // 降雨機率：當天所有區間取最大值
+      const pops = pop12hArr
+        .filter(t => isoDate(new Date(t.StartTime)) === date)
+        .map(t => Number(fv(t.ElementValue?.[0])))
+        .filter(v => !isNaN(v));
+      const pop = pops.length ? Math.max(...pops) : '—';
+
+      return { date, high, low, pop, wx };
+    });
+  } else {
+    // 退回：從逐時資料彙整（3-5 天）
+    const dayMap = new Map();
+    hourlyList.forEach(h => {
+      const dateKey = isoDate(new Date(h.startTime));
+      if (!dayMap.has(dateKey)) dayMap.set(dateKey, []);
+      dayMap.get(dateKey).push(h);
+    });
+    dailyList = Array.from(dayMap.entries()).map(([date, hours]) => {
+      const temps  = hours.map(h => Number(h.t)).filter(v => !isNaN(v));
+      const pops   = hours.map(h => Number(h.pop)).filter(v => !isNaN(v));
+      const mainWx = hours[Math.floor(hours.length / 2)]?.wx || hours[0]?.wx || '';
+      return {
+        date,
+        high: temps.length ? Math.max(...temps) : '—',
+        low:  temps.length ? Math.min(...temps) : '—',
+        pop:  pops.length  ? Math.max(...pops)  : '—',
+        wx:   mainWx,
+      };
+    });
+  }
 
   return { hourlyList, dailyList };
 }
