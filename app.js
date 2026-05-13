@@ -356,6 +356,8 @@ function parseLocation(location, weeklyLocation = null) {
     const wEl = weeklyLocation.WeatherElement || [];
     const wBy = {};
     wEl.forEach(el => { wBy[el.ElementName] = el.Time; });
+    // DEBUG: 確認 weekly dataset 的元素名稱（確認後可移除）
+    console.log('[weekly elements]', Object.keys(wBy), '\n[sample MaxT?]', wBy['最高溫']?.[0], '\n[sample MinT?]', wBy['最低溫']?.[0]);
 
     const maxTArr = wBy['最高溫'] || [];
     const minTArr = wBy['最低溫'] || [];
