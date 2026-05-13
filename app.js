@@ -439,17 +439,19 @@ function getDayHours(dayIdx) {
   return allHourly.filter(h => h.startTime.startsWith(date));
 }
 
-// 從現在的「下一筆」起取 24 筆（上方卡片已顯示當前，不重複）
+// 取現在之後的 24 筆（直接過濾，不依賴 index 計算，上方卡片已顯示當前 slot）
 function getNext24Hours() {
-  const curr = findCurrentSlot(allHourly);
-  const idx  = allHourly.findIndex(h => h.startTime === curr.startTime);
-
-  // 判斷 curr 是否為真正的「過去/現在」slot，是則跳過它從下一筆開始
   const pad = n => String(n).padStart(2, '0');
   const d = new Date();
   const nowStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-  const start = (idx >= 0 && curr.startTime <= nowStr) ? idx + 1 : (idx < 0 ? 0 : idx);
-  return allHourly.slice(start, start + 24);
+  return allHourly.filter(h => h.startTime > nowStr).slice(0, 24);
+}
+
+// 取得本地今日日期字串（YYYY-MM-DD），避免 toISOString() 的 UTC 時差問題
+function localToday() {
+  const pad = n => String(n).padStart(2, '0');
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
 function renderCurrentWeather(h) {
@@ -482,7 +484,7 @@ function renderHourlyForecast(hours, title) {
 }
 
 function renderDailyForecast(days) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
 
   $('dailyList').innerHTML = days.map((d, i) => {
     const dateObj = new Date(d.date + 'T00:00:00');
@@ -514,7 +516,7 @@ function renderDailyForecast(days) {
       selectedDayIndex = idx;
       const day     = allDaily[idx];
       const dateObj = new Date(day.date + 'T00:00:00');
-      const isToday = day.date === new Date().toISOString().slice(0, 10);
+      const isToday = day.date === localToday();
       const hours   = isToday ? getNext24Hours() : getDayHours(idx);
       const label   = isToday
         ? '未來 24 小時預報'
