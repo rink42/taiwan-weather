@@ -354,12 +354,10 @@ function parseLocation(location) {
 
 // ── 找出最接近當前時間的逐時 slot ────────────────────────────────────
 function findCurrentSlot(hourlyList) {
-  const pad = n => String(n).padStart(2, '0');
-  const d = new Date();
-  const nowStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+  const now = new Date();
   let best = hourlyList[0];
   for (const h of hourlyList) {
-    if (h.startTime <= nowStr) best = h;
+    if (new Date(h.startTime) <= now) best = h;
     else break;
   }
   return best;
@@ -435,16 +433,15 @@ function geoLocate({ silent = false, highAccuracy = false } = {}) {
 
 // ── Render helpers ───────────────────────────────────────────────────
 function getDayHours(dayIdx) {
-  const date = allDaily[dayIdx]?.date;
-  return allHourly.filter(h => h.startTime.startsWith(date));
+  const date = allDaily[dayIdx]?.date;  // 'YYYY-MM-DD'
+  // startTime 可能是 ISO 格式 'YYYY-MM-DDT...'，比較前10字元日期部分
+  return allHourly.filter(h => h.startTime.slice(0, 10) === date);
 }
 
-// 取現在之後的 24 筆（直接過濾，不依賴 index 計算，上方卡片已顯示當前 slot）
+// 取現在之後的 24 筆（用 Date 物件比較，避免 ISO 字串格式問題）
 function getNext24Hours() {
-  const pad = n => String(n).padStart(2, '0');
-  const d = new Date();
-  const nowStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-  return allHourly.filter(h => h.startTime > nowStr).slice(0, 24);
+  const now = new Date();
+  return allHourly.filter(h => new Date(h.startTime) > now).slice(0, 24);
 }
 
 // 取得本地今日日期字串（YYYY-MM-DD），避免 toISOString() 的 UTC 時差問題
