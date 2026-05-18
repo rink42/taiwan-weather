@@ -514,7 +514,9 @@ function localToday() {
 
 function renderCurrentWeather(h) {
   if (!h) return;
-  $('currentIcon').innerHTML = wi(h.wx, 88);
+  const nowHour = new Date().getHours();
+  const isNight = nowHour >= 19 || nowHour < 6;
+  $('currentIcon').innerHTML = wi(h.wx, 88, isNight);
   $('currentTemp').textContent = h.t !== '—' ? `${h.t}°C` : '—';
   $('currentDesc').textContent = h.wx;
   $('currentAT').textContent   = h.at !== '—' ? `${h.at}°C` : '—';
@@ -530,11 +532,12 @@ function renderHourlyForecast(hours, title) {
     const time    = h.startTime.slice(11, 16);
     const dateObj = new Date(h.startTime.replace(' ', 'T'));
     const dow     = `(${DOW[dateObj.getDay()]})`;
+    const isNight = dateObj.getHours() >= 19 || dateObj.getHours() < 6;
     return `
       <div class="hourly-item">
         <span class="hourly-dow">${dow}</span>
         <span class="hourly-time">${time}</span>
-        <span class="hourly-icon">${wi(h.wx, 36)}</span>
+        <span class="hourly-icon">${wi(h.wx, 36, isNight)}</span>
         <span class="hourly-temp">${h.t !== '—' ? h.t + '°' : '—'}</span>
         <span class="hourly-pop">${h.pop !== '—' ? '💧' + h.pop + '%' : ''}</span>
       </div>`;

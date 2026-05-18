@@ -76,14 +76,33 @@ function _flake(cx, cy, delay) {
   </g>`;
 }
 
+// ── 月亮（用深色圓遮蔽黃圓製作月牙）────────────────────────────────
+function _moon(cx, cy, r, shadowR, sdx, sdy, cls) {
+  // 黃色主圓 + 深色偏移圓 = 月牙視覺效果
+  return `<g class="${cls || ''}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${_C.sun}"/>
+    <circle cx="${cx + sdx}" cy="${cy + sdy}" r="${shadowR}" fill="#14113a"/>
+  </g>`;
+}
+
 // ── 各天氣圖示 ────────────────────────────────────────────────────────
 function _icoSunny() {
   return _sun(32, 32, 15, 7, 'wi-rays');
 }
 
+function _icoNight() {
+  return _moon(30, 33, 19, 16, 9, -6, 'wi-bob');
+}
+
 function _icoPartlyCloudy() {
   // 小太陽在右上，雲遮住左下
   return `${_sun(46, 16, 10, 4, 'wi-rays-sm')}
+          <g class="wi-bob">${_cloud(26, 22)}</g>`;
+}
+
+function _icoPartlyCloudyNight() {
+  // 小月牙在右上，雲遮住左下
+  return `${_moon(44, 16, 11, 9, 8, -5, 'wi-rays-sm')}
           <g class="wi-bob">${_cloud(26, 22)}</g>`;
 }
 
@@ -112,19 +131,26 @@ function _icoSnow() {
 }
 
 // ── 公開 API ──────────────────────────────────────────────────────────
-// desc = 天氣描述文字, px = 圖示尺寸（像素）
-function wi(desc, px) {
+// desc = 天氣描述文字, px = 圖示尺寸（像素）, isNight = 是否夜間（19:00–06:00）
+function wi(desc, px, isNight) {
   px = px || 64;
   let body;
-  switch (_type(desc)) {
-    case 'sunny':         body = _icoSunny();        break;
-    case 'partly-cloudy': body = _icoPartlyCloudy(); break;
-    case 'cloudy':        body = _icoCloudy();        break;
-    case 'rain':          body = _icoRain(false);     break;
-    case 'heavy-rain':    body = _icoRain(true);      break;
-    case 'storm':         body = _icoStorm();         break;
-    case 'snow':          body = _icoSnow();          break;
-    default:              body = _icoCloudy();
+  const type = _type(desc);
+  if (isNight && type === 'sunny') {
+    body = _icoNight();
+  } else if (isNight && type === 'partly-cloudy') {
+    body = _icoPartlyCloudyNight();
+  } else {
+    switch (type) {
+      case 'sunny':         body = _icoSunny();        break;
+      case 'partly-cloudy': body = _icoPartlyCloudy(); break;
+      case 'cloudy':        body = _icoCloudy();        break;
+      case 'rain':          body = _icoRain(false);     break;
+      case 'heavy-rain':    body = _icoRain(true);      break;
+      case 'storm':         body = _icoStorm();         break;
+      case 'snow':          body = _icoSnow();          break;
+      default:              body = _icoCloudy();
+    }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 64 64" overflow="visible" style="display:block;">${body}</svg>`;
 }
