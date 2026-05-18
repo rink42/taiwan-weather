@@ -8,6 +8,7 @@ const _C = {
   rain  : '#81D4FA',
   bolt  : '#FFF176',
   snow  : '#E1F5FE',
+  moon  : '#D6E4F0',
 };
 
 // ── 天氣類型判斷 ──────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ function _flake(cx, cy, delay) {
 function _moon(cx, cy, r, shadowR, sdx, sdy, cls) {
   // 黃色主圓 + 深色偏移圓 = 月牙視覺效果
   return `<g class="${cls || ''}">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${_C.sun}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${_C.moon}"/>
     <circle cx="${cx + sdx}" cy="${cy + sdy}" r="${shadowR}" fill="#14113a"/>
   </g>`;
 }
