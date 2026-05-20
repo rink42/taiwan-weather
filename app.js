@@ -539,7 +539,8 @@ function renderHourlyForecast(hours, title) {
         <span class="hourly-time">${time}</span>
         <span class="hourly-icon">${wi(h.wx, 36, isNight)}</span>
         <span class="hourly-temp">${h.t !== '—' ? h.t + '°' : '—'}</span>
-        <span class="hourly-pop">${h.pop !== '—' ? '💧' + h.pop + '%' : ''}</span>
+        <span class="hourly-pop">${h.pop !== '—' ? '☔' + h.pop + '%' : ''}</span>
+        <span class="hourly-rh">${h.rh !== '—' ? '💧' + h.rh + '%' : ''}</span>
       </div>`;
   }).join('');
 }

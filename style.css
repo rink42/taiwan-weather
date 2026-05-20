@@ -318,6 +318,11 @@ body {
   color: #93c5fd;
 }
 
+.hourly-rh {
+  font-size: 0.7rem;
+  color: #a5f3fc;
+}
+
 /* ── Daily ── */
 .daily-section {
   margin-bottom: 16px;
