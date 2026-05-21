@@ -297,7 +297,8 @@ function renderDistrict(districtName) {
 
   allHourly = parsed.hourlyList;
   // Open-Meteo 提供 10 天日預報（含風速），優先使用；API 失敗時退回 CWA 逐時彙整
-  allDaily  = cachedOpenMeteoDaily ?? parsed.dailyList;
+  // 過濾掉今天以前的日期（cache 跨日後不顯示舊資料）
+  allDaily  = (cachedOpenMeteoDaily ?? parsed.dailyList).filter(d => d.date >= localToday());
   selectedDayIndex = 0;
 
   // 存入快取供下次 API 失敗時備用
@@ -327,7 +328,8 @@ function renderDistrictFromCache(districtName, countyName, cachedData) {
   }
 
   allHourly = data.hourlyList;
-  allDaily  = data.dailyList;
+  // 同樣過濾掉今天以前的日期
+  allDaily  = data.dailyList.filter(d => d.date >= localToday());
   selectedDayIndex = 0;
 
   renderCurrentWeather(findCurrentSlot(allHourly));
