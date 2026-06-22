@@ -296,9 +296,9 @@ function renderDistrict(districtName) {
   if (!parsed) { showError('資料解析失敗'); return; }
 
   allHourly = parsed.hourlyList;
-  // Open-Meteo 提供 10 天日預報（含風速），優先使用；API 失敗時退回 CWA 逐時彙整
+  // CWA 前 3 天與當前天氣同源 → 優先採用，Open-Meteo 補第 4 天後（含風速）
   // 過濾掉今天以前的日期（cache 跨日後不顯示舊資料）
-  allDaily  = (cachedOpenMeteoDaily ?? parsed.dailyList).filter(d => d.date >= localToday());
+  allDaily  = mergeDailyForecasts(parsed.dailyList, cachedOpenMeteoDaily).filter(d => d.date >= localToday());
   selectedDayIndex = 0;
 
   // 存入快取供下次 API 失敗時備用
@@ -402,7 +402,16 @@ function parseLocation(location) {
   const dailyList = Array.from(dayMap.entries()).map(([date, hours]) => {
     const temps  = hours.map(h => Number(h.t)).filter(v => !isNaN(v));
     const pops   = hours.map(h => Number(h.pop)).filter(v => !isNaN(v));
-    const mainWx = hours[Math.floor(hours.length / 2)]?.wx || hours[0]?.wx || '';
+    // 取白天（09:00~18:00）最惡劣天氣現象，退回全天中間點
+    const daytime = hours.filter(h => { const hr = new Date(h.startTime).getHours(); return hr >= 9 && hr <= 18; });
+    const wxSource = daytime.length ? daytime : hours;
+    const wxPriority = ['雷陣雨', '大雨', '豪雨', '陣雨', '雨', '多雲時陰', '陰', '多雲', '晴時多雲', '晴'];
+    const wxValues = wxSource.map(h => h.wx).filter(Boolean);
+    const mainWx = wxValues.sort((a, b) => {
+      const ai = wxPriority.findIndex(p => a.includes(p));
+      const bi = wxPriority.findIndex(p => b.includes(p));
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    })[0] || wxSource[0]?.wx || hours[0]?.wx || '';
     return {
       date,
       high: temps.length ? Math.max(...temps) : '—',
@@ -413,6 +422,16 @@ function parseLocation(location) {
   });
 
   return { hourlyList, dailyList };
+}
+
+// ── 合併 CWA（前 3 天）與 Open-Meteo（第 4 天以後）日預報 ────────────
+// CWA 資料與當前天氣同源，前幾天用它避免「現在晴/今天雷陣雨」矛盾
+function mergeDailyForecasts(cwaDays, omDays) {
+  if (!omDays?.length) return cwaDays ?? [];
+  if (!cwaDays?.length) return omDays;
+  const cwaDateSet = new Set(cwaDays.map(d => d.date));
+  const omExtra = omDays.filter(d => !cwaDateSet.has(d.date));
+  return [...cwaDays, ...omExtra];
 }
 
 // ── 找出最接近當前時間的逐時 slot ────────────────────────────────────
