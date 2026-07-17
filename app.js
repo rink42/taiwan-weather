@@ -485,17 +485,50 @@ function isTaiwan(lat, lon) {
   return lat >= 21.9 && lat <= 25.3 && lon >= 119.9 && lon <= 122.1;
 }
 
-// ── 國際城市搜尋（Open-Meteo Geocoding API）─────────────────────────
+// ── 國際城市搜尋（Open-Meteo + Nominatim 並行，支援中日韓文）────────
 async function searchCity(query) {
   if (query.length < 2) return [];
-  try {
-    const res = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en`
+
+  const omFetch = fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en`
+  ).then(r => r.ok ? r.json() : null).catch(() => null);
+
+  const nmFetch = fetch(
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&accept-language=en`,
+    { headers: { 'User-Agent': 'TaiwanWeatherApp/1.0' } }
+  ).then(r => r.ok ? r.json() : null).catch(() => null);
+
+  const [omJson, nmJson] = await Promise.all([omFetch, nmFetch]);
+
+  // Open-Meteo 結果
+  const omResults = (omJson?.results ?? []).map(r => ({
+    name: r.name, country: r.country, country_code: r.country_code,
+    admin1: r.admin1 ?? '', latitude: r.latitude, longitude: r.longitude,
+    _src: 'om',
+  }));
+
+  // Nominatim 結果 → 轉換成相同格式（僅取城市/行政區類型）
+  const nmResults = (nmJson ?? [])
+    .filter(r => ['city','town','village','administrative','suburb','county','state'].includes(r.type))
+    .map(r => ({
+      name: r.name || r.display_name.split(',')[0].trim(),
+      country: r.address?.country ?? r.display_name.split(',').at(-1)?.trim() ?? '',
+      country_code: (r.address?.country_code ?? '').toUpperCase(),
+      admin1: r.address?.state ?? r.address?.region ?? '',
+      latitude: parseFloat(r.lat),
+      longitude: parseFloat(r.lon),
+      _src: 'nm',
+    }));
+
+  // 合併：Nominatim 優先（中文查詢），用座標差 0.3° 去重
+  const merged = [...nmResults];
+  for (const om of omResults) {
+    const dup = merged.some(
+      m => Math.abs(m.latitude - om.latitude) < 0.3 && Math.abs(m.longitude - om.longitude) < 0.3
     );
-    if (!res.ok) return [];
-    const json = await res.json();
-    return json.results ?? [];
-  } catch { return []; }
+    if (!dup) merged.push(om);
+  }
+  return merged.slice(0, 6);
 }
 
 function renderIntlSuggestions(results) {
