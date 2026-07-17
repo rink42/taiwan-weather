@@ -817,6 +817,7 @@ async function exportPhoto() {
   a.download = `台灣天氣_${today}.png`;
   a.href = out.toDataURL('image/png');
   a.click();
+  $('photoEditorModal').classList.add('hidden');
 }
 
 // ── Bootstrap ────────────────────────────────────────────────────────
