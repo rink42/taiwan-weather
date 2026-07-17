@@ -30,6 +30,7 @@
           <select id="districtSelect" class="county-select hidden"></select>
           <button id="geoBtn" class="geo-btn" title="偵測目前位置">📍 定位</button>
           <button id="saveBtn" class="save-btn hidden" title="儲存此地點">＋</button>
+          <button id="cameraBtn" class="cam-open-btn" title="拍照天氣貼圖">📷</button>
           <span id="updateTime" class="update-time"></span>
         </div>
       </div>
@@ -97,6 +98,34 @@
         <div id="dailyList" class="daily-list"></div>
       </section>
     </main>
+  </div>
+
+  <!-- 相機預覽 Modal -->
+  <div id="cameraModal" class="modal-overlay hidden">
+    <div class="camera-view">
+      <video id="cameraVideo" autoplay playsinline muted></video>
+      <div class="camera-bar">
+        <button id="closeCameraBtn" class="cam-btn cam-close">✕ 關閉</button>
+        <button id="captureBtn" class="cam-btn cam-shutter">📸 拍照</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 照片編輯 Modal -->
+  <div id="photoEditorModal" class="modal-overlay hidden">
+    <div class="photo-editor">
+      <div id="photoContainer" class="photo-container">
+        <canvas id="photoCanvas"></canvas>
+        <div id="badgeLocation" class="badge">📍 <span id="badgeLocationText"></span></div>
+        <div id="badgeIcon"     class="badge badge-icon"></div>
+        <div id="badgeTemp"     class="badge badge-temp"></div>
+        <div id="badgeDesc"     class="badge"><span id="badgeDescText"></span></div>
+      </div>
+      <div class="editor-bar">
+        <button id="retakeBtn" class="cam-btn cam-close">🔄 重拍</button>
+        <button id="exportBtn" class="cam-btn cam-shutter">💾 儲存圖片</button>
+      </div>
+    </div>
   </div>
 
   <script src="icons.js"></script>

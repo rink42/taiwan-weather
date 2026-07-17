@@ -178,6 +178,17 @@ function init() {
 
   renderSavedSelect();
 
+  // 相機按鈕
+  $('cameraBtn').addEventListener('click', openCamera);
+  $('closeCameraBtn').addEventListener('click', closeCamera);
+  $('captureBtn').addEventListener('click', capturePhoto);
+  $('retakeBtn').addEventListener('click', () => {
+    $('photoEditorModal').classList.add('hidden');
+    openCamera();
+  });
+  $('exportBtn').addEventListener('click', exportPhoto);
+  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => makeDraggable($(id)));
+
   if (API_KEY === 'YOUR_API_KEY') {
     apiKeyNotice.classList.remove('hidden');
     return;
@@ -664,6 +675,148 @@ function renderSavedSelect() {
   // 有記憶位置才顯示下拉
   savedSelect.classList.toggle('hidden', savedLocations.length === 0);
   savedSelect.value = '';
+}
+
+// ── 拍照天氣貼圖 ─────────────────────────────────────────────────────
+let cameraStream = null;
+
+function openCamera() {
+  if (!allHourly.length) {
+    showError('請先載入天氣資料，再使用拍照功能');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    .then(stream => {
+      cameraStream = stream;
+      $('cameraVideo').srcObject = stream;
+      $('cameraModal').classList.remove('hidden');
+    })
+    .catch(() => showError('無法開啟相機，請確認已授予相機權限'));
+}
+
+function closeCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  $('cameraModal').classList.add('hidden');
+}
+
+function capturePhoto() {
+  const video  = $('cameraVideo');
+  const canvas = $('photoCanvas');
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  if (!w || !h) return;
+  canvas.width  = w;
+  canvas.height = h;
+  canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+  closeCamera();
+  populateBadges();
+  $('photoEditorModal').classList.remove('hidden');
+  requestAnimationFrame(positionBadges);
+}
+
+function populateBadges() {
+  const slot   = findCurrentSlot(allHourly);
+  const county = lastLocation?.county ?? countySelect.value;
+  const dist   = lastLocation?.district ?? districtSelect.value;
+  $('badgeLocationText').textContent = county + (dist ? ' ' + dist : '');
+  $('badgeIcon').innerHTML = wi(slot.wx, 52);
+  $('badgeTemp').textContent = (slot.t !== '—' ? slot.t : '?') + '°C';
+  $('badgeDescText').textContent = slot.wx;
+}
+
+function positionBadges() {
+  const c = $('photoContainer');
+  const w = c.offsetWidth;
+  const h = c.offsetHeight;
+  [
+    ['badgeLocation', 0.05, 0.06],
+    ['badgeIcon',     0.68, 0.05],
+    ['badgeTemp',     0.05, 0.76],
+    ['badgeDesc',     0.50, 0.76],
+  ].forEach(([id, rx, ry]) => {
+    const el = $(id);
+    el.style.left = Math.round(rx * w) + 'px';
+    el.style.top  = Math.round(ry * h) + 'px';
+  });
+}
+
+function makeDraggable(el) {
+  let ox, oy, oleft, otop;
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    ox = e.clientX; oy = e.clientY;
+    oleft = el.offsetLeft; otop = el.offsetTop;
+  });
+  el.addEventListener('pointermove', e => {
+    if (!(e.buttons & 1)) return;
+    const cont = $('photoContainer');
+    const maxL = cont.offsetWidth  - el.offsetWidth;
+    const maxT = cont.offsetHeight - el.offsetHeight;
+    el.style.left = Math.max(0, Math.min(maxL, oleft + e.clientX - ox)) + 'px';
+    el.style.top  = Math.max(0, Math.min(maxT, otop  + e.clientY - oy)) + 'px';
+  });
+}
+
+function svgBlobToImage(svgStr) {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url  = URL.createObjectURL(blob);
+    const img  = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function exportPhoto() {
+  const src  = $('photoCanvas');
+  const cont = $('photoContainer');
+  const out  = document.createElement('canvas');
+  out.width  = src.width;
+  out.height = src.height;
+  const ctx  = out.getContext('2d');
+  ctx.drawImage(src, 0, 0);
+
+  const sx = src.width  / cont.offsetWidth;
+  const sy = src.height / cont.offsetHeight;
+
+  for (const badge of cont.querySelectorAll('.badge')) {
+    const bx = badge.offsetLeft * sx;
+    const by = badge.offsetTop  * sy;
+    const bw = badge.offsetWidth  * sx;
+    const bh = badge.offsetHeight * sy;
+
+    if (badge.id === 'badgeIcon') {
+      try {
+        const img = await svgBlobToImage(badge.innerHTML);
+        ctx.drawImage(img, bx, by, bw, bh);
+      } catch { /* skip if SVG fails */ }
+      continue;
+    }
+
+    const text = badge.textContent.trim();
+    const fs   = Math.round(15 * sx);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, 10 * sx);
+    ctx.fill();
+    ctx.font         = `600 ${fs}px "PingFang TC","Microsoft JhengHei",sans-serif`;
+    ctx.fillStyle    = '#ffffff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, bx + 12 * sx, by + bh / 2);
+    ctx.restore();
+  }
+
+  const today = new Date().toLocaleDateString('zh-TW').replace(/\//g, '-');
+  const a = document.createElement('a');
+  a.download = `台灣天氣_${today}.png`;
+  a.href = out.toDataURL('image/png');
+  a.click();
 }
 
 // ── Bootstrap ────────────────────────────────────────────────────────
