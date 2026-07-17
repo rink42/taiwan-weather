@@ -50,6 +50,18 @@ const WMO_DESC = {
 
 const DOW = ['日','一','二','三','四','五','六'];
 
+// 國家代碼 → 中文名稱（Open-Meteo country_code）
+const COUNTRY_ZH = {
+  JP:'日本', CN:'中國', KR:'韓國', US:'美國', GB:'英國', FR:'法國',
+  DE:'德國', IT:'義大利', ES:'西班牙', NL:'荷蘭', BE:'比利時', CH:'瑞士',
+  AT:'奧地利', CZ:'捷克', PL:'波蘭', HU:'匈牙利', SK:'斯洛伐克', RO:'羅馬尼亞',
+  GR:'希臘', PT:'葡萄牙', SE:'瑞典', NO:'挪威', DK:'丹麥', FI:'芬蘭',
+  HR:'克羅埃西亞', SI:'斯洛維尼亞', RS:'塞爾維亞', BG:'保加利亞', UA:'烏克蘭',
+  TR:'土耳其', RU:'俄羅斯', AU:'澳洲', NZ:'紐西蘭', CA:'加拿大', MX:'墨西哥',
+  BR:'巴西', AR:'阿根廷', ZA:'南非', IN:'印度', TH:'泰國', VN:'越南',
+  SG:'新加坡', MY:'馬來西亞', ID:'印尼', PH:'菲律賓', HK:'香港', MO:'澳門',
+};
+
 // ── State ────────────────────────────────────────────────────────────
 let allHourly = [];
 let allDaily  = [];
@@ -226,6 +238,7 @@ async function loadCounty(countyName, targetDistrict) {
   lastIntlLocation = null;
   $('intlSearch').value = '';
   $('intlSuggestions').classList.add('hidden');
+  $('appTitle').textContent = '🌤 台灣天氣';
 
   showLoading(true);
   hideError();
@@ -508,6 +521,8 @@ function selectIntlCity(city) {
   lastIntlLocation = { name: city.name, country: city.country ?? '', lat: city.latitude, lon: city.longitude };
   $('intlSearch').value = [city.name, city.admin1, city.country].filter(Boolean).join(', ');
   $('intlSuggestions').classList.add('hidden');
+  const countryZh = COUNTRY_ZH[city.country_code] ?? city.country ?? '';
+  $('appTitle').textContent = `🌤 ${countryZh}${city.name}天氣`;
   fetchIntlWeather(city.latitude, city.longitude);
 }
 
@@ -627,6 +642,7 @@ function geoLocate({ silent = false, highAccuracy = false } = {}) {
           const loc = await reverseGeocodeIntl(lat, lon);
           lastIntlLocation = loc;
           $('intlSearch').value = [loc.name, loc.country].filter(Boolean).join(', ');
+          $('appTitle').textContent = `🌤 ${loc.name}天氣`;
           await fetchIntlWeather(lat, lon);
           return;
         }
