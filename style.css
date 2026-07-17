@@ -688,6 +688,22 @@ body {
   width: 170px;
 }
 
+.intl-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  outline: none;
+}
+.intl-clear:hover { color: var(--text); }
+
 .intl-suggestions {
   position: absolute;
   top: calc(100% + 4px);

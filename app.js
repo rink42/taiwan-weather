@@ -197,6 +197,7 @@ function init() {
   intlSearchEl.addEventListener('input', () => {
     clearTimeout(intlSearchTimer);
     const q = intlSearchEl.value.trim();
+    $('intlClear').classList.toggle('hidden', q.length === 0);
     if (q.length < 2) { $('intlSuggestions').classList.add('hidden'); return; }
     intlSearchTimer = setTimeout(async () => {
       const results = await searchCity(q);
@@ -205,6 +206,12 @@ function init() {
   });
   intlSearchEl.addEventListener('blur', () => {
     setTimeout(() => $('intlSuggestions').classList.add('hidden'), 200);
+  });
+  $('intlClear').addEventListener('click', () => {
+    intlSearchEl.value = '';
+    $('intlClear').classList.add('hidden');
+    $('intlSuggestions').classList.add('hidden');
+    intlSearchEl.focus();
   });
 
   // 相機按鈕
