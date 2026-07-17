@@ -660,3 +660,68 @@ body {
   padding: 6px 8px;
   background: rgba(0,0,0,0.45);
 }
+
+/* ── 國際城市搜尋 ─────────────────────────────────────────────────── */
+.intl-search-wrap {
+  position: relative;
+}
+
+.intl-search {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 7px 10px;
+  width: 130px;
+  cursor: text;
+  backdrop-filter: blur(8px);
+  outline: none;
+  transition: border-color 0.2s, width 0.2s;
+  font-family: inherit;
+}
+
+.intl-search::placeholder { color: var(--text-dim); }
+
+.intl-search:focus {
+  border-color: var(--accent);
+  width: 170px;
+}
+
+.intl-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 230px;
+  background: #1e1b4b;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  z-index: 200;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+.intl-suggestion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  cursor: pointer;
+  gap: 10px;
+  transition: background 0.15s;
+}
+
+.intl-suggestion:hover { background: rgba(124,131,253,0.18); }
+
+.intl-city {
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.intl-meta {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  text-align: right;
+}

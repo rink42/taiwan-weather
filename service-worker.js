@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_VER = 'tw-weather-v28';
+const CACHE_VER = 'tw-weather-v29';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -37,7 +37,9 @@ self.addEventListener('fetch', event => {
   const url = event.request.url;
 
   // CWA / NLSC API → Network-Only（天氣與定位資料必須即時）
-  if (url.includes('opendata.cwa.gov.tw') || url.includes('api.nlsc.gov.tw') || url.includes('api.open-meteo.com')) {
+  if (url.includes('opendata.cwa.gov.tw') || url.includes('api.nlsc.gov.tw') ||
+      url.includes('api.open-meteo.com') || url.includes('geocoding-api.open-meteo.com') ||
+      url.includes('nominatim.openstreetmap.org')) {
     event.respondWith(fetch(event.request));
     return;
   }

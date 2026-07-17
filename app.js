@@ -57,8 +57,10 @@ let selectedDayIndex = 0;
 let cachedCountyLocations = null;
 let cachedOpenMeteoDaily  = null;  // Open-Meteo 10天日預報
 let isOfflineMode = false;
-let savedLocations = JSON.parse(localStorage.getItem('tw-weather-saved') || '[]');
-let lastLocation   = JSON.parse(localStorage.getItem('tw-weather-last')  || 'null');
+let savedLocations  = JSON.parse(localStorage.getItem('tw-weather-saved') || '[]');
+let lastLocation    = JSON.parse(localStorage.getItem('tw-weather-last')  || 'null');
+let lastIntlLocation = null;  // { name, country, lat, lon }
+let intlSearchTimer  = null;
 
 // ── localStorage 快取輔助 ────────────────────────────────────────────
 function saveDistrictList(countyName, names) {
@@ -178,6 +180,21 @@ function init() {
 
   renderSavedSelect();
 
+  // 國際城市搜尋
+  const intlSearchEl = $('intlSearch');
+  intlSearchEl.addEventListener('input', () => {
+    clearTimeout(intlSearchTimer);
+    const q = intlSearchEl.value.trim();
+    if (q.length < 2) { $('intlSuggestions').classList.add('hidden'); return; }
+    intlSearchTimer = setTimeout(async () => {
+      const results = await searchCity(q);
+      renderIntlSuggestions(results);
+    }, 400);
+  });
+  intlSearchEl.addEventListener('blur', () => {
+    setTimeout(() => $('intlSuggestions').classList.add('hidden'), 200);
+  });
+
   // 相機按鈕
   $('cameraBtn').addEventListener('click', openCamera);
   $('closeCameraBtn').addEventListener('click', closeCamera);
@@ -205,6 +222,11 @@ function init() {
 
 // ── Fetch county → populate district dropdown ────────────────────────
 async function loadCounty(countyName, targetDistrict) {
+  // 切回台灣模式，清除國際狀態
+  lastIntlLocation = null;
+  $('intlSearch').value = '';
+  $('intlSuggestions').classList.add('hidden');
+
   showLoading(true);
   hideError();
   hideSections();
@@ -445,6 +467,127 @@ function mergeDailyForecasts(cwaDays, omDays) {
   return [...cwaDays, ...omExtra];
 }
 
+// ── 台灣邊界判斷 ─────────────────────────────────────────────────────
+function isTaiwan(lat, lon) {
+  return lat >= 21.9 && lat <= 25.3 && lon >= 119.9 && lon <= 122.1;
+}
+
+// ── 國際城市搜尋（Open-Meteo Geocoding API）─────────────────────────
+async function searchCity(query) {
+  if (query.length < 2) return [];
+  try {
+    const res = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en`
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.results ?? [];
+  } catch { return []; }
+}
+
+function renderIntlSuggestions(results) {
+  const el = $('intlSuggestions');
+  if (!results.length) { el.classList.add('hidden'); return; }
+  el.innerHTML = results.map((r, i) =>
+    `<div class="intl-suggestion" data-idx="${i}">
+      <span class="intl-city">${r.name}</span>
+      <span class="intl-meta">${[r.admin1, r.country].filter(Boolean).join(', ')}</span>
+    </div>`
+  ).join('');
+  el._results = results;
+  el.querySelectorAll('.intl-suggestion').forEach(item => {
+    item.addEventListener('mousedown', e => {
+      e.preventDefault();
+      selectIntlCity(el._results[Number(item.dataset.idx)]);
+    });
+  });
+  el.classList.remove('hidden');
+}
+
+function selectIntlCity(city) {
+  lastIntlLocation = { name: city.name, country: city.country ?? '', lat: city.latitude, lon: city.longitude };
+  $('intlSearch').value = [city.name, city.admin1, city.country].filter(Boolean).join(', ');
+  $('intlSuggestions').classList.add('hidden');
+  fetchIntlWeather(city.latitude, city.longitude);
+}
+
+// ── 國際 GPS 反解（Nominatim）────────────────────────────────────────
+async function reverseGeocodeIntl(lat, lon) {
+  const res  = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`,
+    { headers: { 'User-Agent': 'TaiwanWeatherApp/1.0' } }
+  );
+  if (!res.ok) throw new Error('Nominatim error');
+  const json = await res.json();
+  const addr = json.address ?? {};
+  const name = addr.city || addr.town || addr.village || addr.county || json.display_name?.split(',')[0] || 'Unknown';
+  return { name, country: addr.country ?? '', lat, lon };
+}
+
+// ── 國際天氣資料（Open-Meteo 全球）──────────────────────────────────
+async function fetchIntlWeather(lat, lon) {
+  showLoading(true);
+  hideError();
+  hideSections();
+
+  const url = `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${lat}&longitude=${lon}` +
+    `&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,precipitation_probability,weather_code` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max` +
+    `&wind_speed_unit=ms&timezone=auto&forecast_days=7`;
+
+  try {
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    allHourly = parseIntlHourly(json);
+    allDaily  = parseIntlDaily(json).filter(d => d.date >= localToday());
+    selectedDayIndex = 0;
+
+    renderCurrentWeather(findCurrentSlot(allHourly));
+    renderHourlyForecast(getNext24Hours(), '未來 24 小時預報');
+    renderDailyForecast(allDaily);
+    $('updateTime').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+    showSections();
+    saveBtn.classList.add('hidden');
+  } catch {
+    showError('無法取得天氣資料，請稍後再試');
+  } finally {
+    showLoading(false);
+  }
+}
+
+function parseIntlHourly(json) {
+  const h = json?.hourly;
+  if (!h?.time?.length) return [];
+  return h.time.map((t, i) => {
+    const code = h.weather_code?.[i];
+    return {
+      startTime: t.replace('T', ' ') + ':00',
+      wx:  WMO_DESC[code] ?? '多雲',
+      t:   h.temperature_2m?.[i]            != null ? Math.round(h.temperature_2m[i])         : '—',
+      at:  h.apparent_temperature?.[i]      != null ? Math.round(h.apparent_temperature[i])   : '—',
+      pop: h.precipitation_probability?.[i] != null ? h.precipitation_probability[i]          : '—',
+      rh:  h.relative_humidity_2m?.[i]      != null ? h.relative_humidity_2m[i]               : '—',
+      ws:  h.wind_speed_10m?.[i]            != null ? Math.round(h.wind_speed_10m[i])         : '—',
+    };
+  });
+}
+
+function parseIntlDaily(json) {
+  const d = json?.daily;
+  if (!d?.time?.length) return [];
+  return d.time.map((date, i) => ({
+    date,
+    high: d.temperature_2m_max?.[i]            != null ? Math.round(d.temperature_2m_max[i])           : '—',
+    low:  d.temperature_2m_min?.[i]            != null ? Math.round(d.temperature_2m_min[i])           : '—',
+    pop:  d.precipitation_probability_max?.[i] != null ? d.precipitation_probability_max[i]            : '—',
+    wind: d.wind_speed_10m_max?.[i]            != null ? Math.round(d.wind_speed_10m_max[i])           : '—',
+    wx:   WMO_DESC[d.weather_code?.[i]] ?? '多雲',
+  }));
+}
+
 // ── 找出最接近當前時間的逐時 slot ────────────────────────────────────
 function findCurrentSlot(hourlyList) {
   const now = new Date();
@@ -478,15 +621,25 @@ function geoLocate({ silent = false, highAccuracy = false } = {}) {
     async pos => {
       try {
         const { latitude: lat, longitude: lon } = pos.coords;
-        // 使用內政部國土測繪中心官方 API，行政區邊界與政府資料一致
+
+        if (!isTaiwan(lat, lon)) {
+          // 台灣以外 → 國際定位
+          const loc = await reverseGeocodeIntl(lat, lon);
+          lastIntlLocation = loc;
+          $('intlSearch').value = [loc.name, loc.country].filter(Boolean).join(', ');
+          await fetchIntlWeather(lat, lon);
+          return;
+        }
+
+        // 台灣 → 使用內政部國土測繪中心官方 API
         const url = `https://api.nlsc.gov.tw/other/TownVillagePointQuery/${lon}/${lat}/4326`;
         const res  = await fetch(url);
         const text = await res.text();
         const xml  = new DOMParser().parseFromString(text, 'text/xml');
 
         const get      = tag => xml.querySelector(tag)?.textContent?.trim() || '';
-        const county   = get('ctyName');    // e.g. 臺北市
-        const district = get('townName');   // e.g. 萬華區
+        const county   = get('ctyName');
+        const district = get('townName');
 
         if (!county || !COUNTY_DATASET[county]) {
           if (!silent) showError(`無法識別您的位置（${county || '未知縣市'}），請手動選擇`);
@@ -718,10 +871,16 @@ function capturePhoto() {
 }
 
 function populateBadges() {
-  const slot   = findCurrentSlot(allHourly);
-  const county = lastLocation?.county ?? countySelect.value;
-  const dist   = lastLocation?.district ?? districtSelect.value;
-  $('badgeLocationText').textContent = county + (dist ? ' ' + dist : '');
+  const slot = findCurrentSlot(allHourly);
+  let locationText;
+  if (lastIntlLocation) {
+    locationText = [lastIntlLocation.name, lastIntlLocation.country].filter(Boolean).join(', ');
+  } else {
+    const county = lastLocation?.county ?? countySelect.value;
+    const dist   = lastLocation?.district ?? districtSelect.value;
+    locationText = county + (dist ? ' ' + dist : '');
+  }
+  $('badgeLocationText').textContent = locationText;
   $('badgeIcon').innerHTML = wi(slot.wx, 52);
   $('badgeTemp').textContent = (slot.t !== '—' ? slot.t : '?') + '°C';
   $('badgeDescText').textContent = slot.wx;
