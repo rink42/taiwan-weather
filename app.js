@@ -108,7 +108,13 @@ function applyBadgeFmt(el, fmt) {
     el.style.fontStyle = el.dataset.italic === '1' ? 'italic' : '';
   } else if (fmt === 'shadow') {
     toggle('shadow');
-    el.style.textShadow = el.dataset.shadow === '1' ? '1px 1px 4px rgba(0,0,0,0.95)' : '';
+    if (el.dataset.shadow === '1') {
+      el.style.webkitTextStroke = '3px #000';
+      el.style.paintOrder = 'stroke fill';
+    } else {
+      el.style.webkitTextStroke = '';
+      el.style.paintOrder = '';
+    }
   }
   syncToolbar(el);
 }
@@ -118,6 +124,7 @@ function resetBadgeStyle(el) {
   el.dataset.italic = '0';      el.dataset.shadow = '0';
   el.style.cssText = el.style.cssText; // keep position; reset only format below
   el.style.color = ''; el.style.fontWeight = ''; el.style.fontStyle = '';
+  el.style.webkitTextStroke = ''; el.style.paintOrder = '';
   el.style.textShadow = ''; el.style.background = ''; el.style.fontSize = '';
 }
 
@@ -1152,10 +1159,11 @@ async function exportPhoto() {
     ctx.fillStyle    = color;
     ctx.textBaseline = 'middle';
     if (hasShadow) {
-      ctx.shadowColor   = 'rgba(0,0,0,0.95)';
-      ctx.shadowBlur    = 4 * sx;
-      ctx.shadowOffsetX = 1 * sx;
-      ctx.shadowOffsetY = 1 * sx;
+      const outlineColor = (color === '#000000') ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.9)';
+      ctx.strokeStyle = outlineColor;
+      ctx.lineWidth   = Math.round(4 * sx);
+      ctx.lineJoin    = 'round';
+      ctx.strokeText(text, bx + 12 * sx, by + bh / 2);
     }
     ctx.fillText(text, bx + 12 * sx, by + bh / 2);
     ctx.restore();

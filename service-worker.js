@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_VER = 'tw-weather-v34';
+const CACHE_VER = 'tw-weather-v35';
 const STATIC_ASSETS = [
   './',
   './index.html',
