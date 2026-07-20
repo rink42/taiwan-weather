@@ -295,6 +295,7 @@ function init() {
   $('cameraBtn').addEventListener('click', openCamera);
   $('closeCameraBtn').addEventListener('click', closeCamera);
   $('captureBtn').addEventListener('click', capturePhoto);
+  $('albumInput').addEventListener('change', loadAlbumPhoto);
   $('retakeBtn').addEventListener('click', () => {
     $('photoEditorModal').classList.add('hidden');
     openCamera();
@@ -1022,6 +1023,30 @@ function capturePhoto() {
   populateBadges();
   $('photoEditorModal').classList.remove('hidden');
   requestAnimationFrame(positionBadges);
+}
+
+function loadAlbumPhoto() {
+  const file = $('albumInput').files[0];
+  if (!file) return;
+  if (!allHourly.length) { showError('請先載入天氣資料，再使用此功能'); $('albumInput').value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = $('photoCanvas');
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      closeCamera();
+      $('albumInput').value = '';
+      deselectAll();
+      populateBadges();
+      $('photoEditorModal').classList.remove('hidden');
+      requestAnimationFrame(positionBadges);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function populateBadges() {
