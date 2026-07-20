@@ -108,13 +108,11 @@ function applyBadgeFmt(el, fmt) {
     el.style.fontStyle = el.dataset.italic === '1' ? 'italic' : '';
   } else if (fmt === 'shadow') {
     toggle('shadow');
-    if (el.dataset.shadow === '1') {
-      el.style.webkitTextStroke = '3px #000';
-      el.style.paintOrder = 'stroke fill';
-    } else {
-      el.style.webkitTextStroke = '';
-      el.style.paintOrder = '';
-    }
+    const isDark = (el.dataset.color || '#ffffff') === '#000000';
+    const oc = isDark ? '#fff' : '#000';
+    el.style.textShadow = el.dataset.shadow === '1'
+      ? `-2px -2px 0 ${oc}, 2px -2px 0 ${oc}, -2px 2px 0 ${oc}, 2px 2px 0 ${oc}, 0 -2px 0 ${oc}, 0 2px 0 ${oc}, -2px 0 0 ${oc}, 2px 0 0 ${oc}`
+      : '';
   }
   syncToolbar(el);
 }
@@ -124,7 +122,6 @@ function resetBadgeStyle(el) {
   el.dataset.italic = '0';      el.dataset.shadow = '0';
   el.style.cssText = el.style.cssText; // keep position; reset only format below
   el.style.color = ''; el.style.fontWeight = ''; el.style.fontStyle = '';
-  el.style.webkitTextStroke = ''; el.style.paintOrder = '';
   el.style.textShadow = ''; el.style.background = ''; el.style.fontSize = '';
 }
 
