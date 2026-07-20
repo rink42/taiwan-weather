@@ -90,11 +90,29 @@ function syncToolbar(el) {
   $('shadowBtn').classList.toggle('active', el.dataset.shadow === '1');
 }
 
+// 雙層描邊：白色內框（1px）+ 黑色外框（3px），任何背景都可見
+// 黑色文字時反轉：黑色內框 + 白色外框
+function applyOutlineStyle(el) {
+  if (el.dataset.shadow !== '1') { el.style.textShadow = ''; return; }
+  const isDarkText = (el.dataset.color || '#ffffff') === '#000000';
+  const inner = isDarkText ? '#000' : 'rgba(255,255,255,0.85)';
+  const outer = isDarkText ? '#fff' : '#000';
+  el.style.textShadow = [
+    `-1px -1px 0 ${inner}`, `1px -1px 0 ${inner}`,
+    `-1px  1px 0 ${inner}`, `1px  1px 0 ${inner}`,
+    `-3px -3px 0 ${outer}`, `3px -3px 0 ${outer}`,
+    `-3px  3px 0 ${outer}`, `3px  3px 0 ${outer}`,
+    `0 -3px 0 ${outer}`,    `0  3px 0 ${outer}`,
+    `-3px 0 0 ${outer}`,    `3px  0 0 ${outer}`,
+  ].join(', ');
+}
+
 function applyBadgeColor(el, color) {
   el.dataset.color = color;
   el.style.color   = color;
   const isDark = color === '#000000';
   el.style.background = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
+  applyOutlineStyle(el);  // 顏色改變時同步更新外框
   syncToolbar(el);
 }
 
@@ -108,11 +126,7 @@ function applyBadgeFmt(el, fmt) {
     el.style.fontStyle = el.dataset.italic === '1' ? 'italic' : '';
   } else if (fmt === 'shadow') {
     toggle('shadow');
-    const isDark = (el.dataset.color || '#ffffff') === '#000000';
-    const oc = isDark ? '#fff' : '#000';
-    el.style.textShadow = el.dataset.shadow === '1'
-      ? `-2px -2px 0 ${oc}, 2px -2px 0 ${oc}, -2px 2px 0 ${oc}, 2px 2px 0 ${oc}, 0 -2px 0 ${oc}, 0 2px 0 ${oc}, -2px 0 0 ${oc}, 2px 0 0 ${oc}`
-      : '';
+    applyOutlineStyle(el);
   }
   syncToolbar(el);
 }
@@ -1155,14 +1169,20 @@ async function exportPhoto() {
     ctx.font         = `${isItalic ? 'italic ' : ''}${isBold ? '700' : '600'} ${fs}px "PingFang TC","Microsoft JhengHei",sans-serif`;
     ctx.fillStyle    = color;
     ctx.textBaseline = 'middle';
+    const tx = bx + 12 * sx, ty = by + bh / 2;
     if (hasShadow) {
-      const outlineColor = (color === '#000000') ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.9)';
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth   = Math.round(4 * sx);
+      const isDarkText = color === '#000000';
+      // 外框（較粗）
+      ctx.strokeStyle = isDarkText ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.9)';
+      ctx.lineWidth   = Math.round(6 * sx);
       ctx.lineJoin    = 'round';
-      ctx.strokeText(text, bx + 12 * sx, by + bh / 2);
+      ctx.strokeText(text, tx, ty);
+      // 內框（較細，蓋住外框中間部分，讓邊緣更銳利）
+      ctx.strokeStyle = isDarkText ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)';
+      ctx.lineWidth   = Math.round(2 * sx);
+      ctx.strokeText(text, tx, ty);
     }
-    ctx.fillText(text, bx + 12 * sx, by + bh / 2);
+    ctx.fillText(text, tx, ty);
     ctx.restore();
   }
 
