@@ -62,6 +62,65 @@ const COUNTRY_ZH = {
   SG:'新加坡', MY:'馬來西亞', ID:'印尼', PH:'菲律賓', HK:'香港', MO:'澳門',
 };
 
+// ── Badge 選取 & 格式狀態 ─────────────────────────────────────────────
+let selectedBadge = null;
+
+function selectBadge(el) {
+  if (selectedBadge && selectedBadge !== el) selectedBadge.classList.remove('selected');
+  selectedBadge = el;
+  el.classList.add('selected');
+  syncToolbar(el);
+  $('badgeToolbar').classList.remove('hidden');
+}
+
+function deselectAll() {
+  if (selectedBadge) selectedBadge.classList.remove('selected');
+  selectedBadge = null;
+  $('badgeToolbar').classList.add('hidden');
+}
+
+function syncToolbar(el) {
+  const color = el.dataset.color || '#ffffff';
+  $('badgeToolbar').querySelectorAll('.badge-color-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.color === color)
+  );
+  $('badgeColorPicker').value = color;
+  $('boldBtn').classList.toggle('active',   el.dataset.bold   === '1');
+  $('italicBtn').classList.toggle('active', el.dataset.italic === '1');
+  $('shadowBtn').classList.toggle('active', el.dataset.shadow === '1');
+}
+
+function applyBadgeColor(el, color) {
+  el.dataset.color = color;
+  el.style.color   = color;
+  const isDark = color === '#000000';
+  el.style.background = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
+  syncToolbar(el);
+}
+
+function applyBadgeFmt(el, fmt) {
+  const toggle = key => { el.dataset[key] = el.dataset[key] === '1' ? '0' : '1'; };
+  if (fmt === 'bold') {
+    toggle('bold');
+    el.style.fontWeight = el.dataset.bold === '1' ? 'bold' : '';
+  } else if (fmt === 'italic') {
+    toggle('italic');
+    el.style.fontStyle = el.dataset.italic === '1' ? 'italic' : '';
+  } else if (fmt === 'shadow') {
+    toggle('shadow');
+    el.style.textShadow = el.dataset.shadow === '1' ? '1px 1px 4px rgba(0,0,0,0.95)' : '';
+  }
+  syncToolbar(el);
+}
+
+function resetBadgeStyle(el) {
+  el.dataset.color = '#ffffff'; el.dataset.bold = '0';
+  el.dataset.italic = '0';      el.dataset.shadow = '0';
+  el.style.cssText = el.style.cssText; // keep position; reset only format below
+  el.style.color = ''; el.style.fontWeight = ''; el.style.fontStyle = '';
+  el.style.textShadow = ''; el.style.background = ''; el.style.fontSize = '';
+}
+
 // ── State ────────────────────────────────────────────────────────────
 let allHourly = [];
 let allDaily  = [];
@@ -223,7 +282,27 @@ function init() {
     openCamera();
   });
   $('exportBtn').addEventListener('click', exportPhoto);
-  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => makeDraggable($(id)));
+  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => {
+    makeDraggable($(id));
+    makeResizable($(id));
+  });
+
+  // 點底圖空白處取消選取
+  $('photoContainer').addEventListener('pointerdown', e => {
+    if (!e.target.closest('.badge')) deselectAll();
+  });
+
+  // Badge 格式工具列
+  $('badgeToolbar').querySelectorAll('.badge-color-btn').forEach(btn => {
+    btn.addEventListener('click', () => { if (selectedBadge) applyBadgeColor(selectedBadge, btn.dataset.color); });
+  });
+  $('badgeColorPicker').addEventListener('input', () => {
+    if (selectedBadge) applyBadgeColor(selectedBadge, $('badgeColorPicker').value);
+  });
+  $('badgeColorPicker').parentElement.addEventListener('click', () => $('badgeColorPicker').click());
+  $('boldBtn').addEventListener('click',   () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'bold'); });
+  $('italicBtn').addEventListener('click', () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'italic'); });
+  $('shadowBtn').addEventListener('click', () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'shadow'); });
 
   if (API_KEY === 'YOUR_API_KEY') {
     apiKeyNotice.classList.remove('hidden');
@@ -921,12 +1000,14 @@ function capturePhoto() {
   canvas.height = h;
   canvas.getContext('2d').drawImage(video, 0, 0, w, h);
   closeCamera();
+  deselectAll();
   populateBadges();
   $('photoEditorModal').classList.remove('hidden');
   requestAnimationFrame(positionBadges);
 }
 
 function populateBadges() {
+  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => resetBadgeStyle($(id)));
   const slot = findCurrentSlot(allHourly);
   let locationText;
   if (lastIntlLocation) {
@@ -961,7 +1042,9 @@ function positionBadges() {
 function makeDraggable(el) {
   let ox, oy, oleft, otop;
   el.addEventListener('pointerdown', e => {
+    if (e.target.classList.contains('badge-handle')) return;
     e.preventDefault();
+    selectBadge(el);
     el.setPointerCapture(e.pointerId);
     ox = e.clientX; oy = e.clientY;
     oleft = el.offsetLeft; otop = el.offsetTop;
@@ -973,6 +1056,41 @@ function makeDraggable(el) {
     const maxT = cont.offsetHeight - el.offsetHeight;
     el.style.left = Math.max(0, Math.min(maxL, oleft + e.clientX - ox)) + 'px';
     el.style.top  = Math.max(0, Math.min(maxT, otop  + e.clientY - oy)) + 'px';
+  });
+}
+
+function makeResizable(badge) {
+  const handle = document.createElement('div');
+  handle.className = 'badge-handle';
+  badge.appendChild(handle);
+
+  let startX, startY, startSize;
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    handle.setPointerCapture(e.pointerId);
+    startX = e.clientX;
+    startY = e.clientY;
+    if (badge.id === 'badgeIcon') {
+      const svg = badge.querySelector('svg');
+      startSize = parseFloat(svg?.getAttribute('width') || 52);
+    } else {
+      startSize = parseFloat(window.getComputedStyle(badge).fontSize);
+    }
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!(e.buttons & 1)) return;
+    const delta = (e.clientX - startX + e.clientY - startY) / 2;
+    if (badge.id === 'badgeIcon') {
+      const svg = badge.querySelector('svg');
+      if (!svg) return;
+      const newSize = Math.max(24, Math.min(160, startSize + delta * 0.5));
+      svg.setAttribute('width',  newSize);
+      svg.setAttribute('height', newSize);
+    } else {
+      const newSize = Math.max(10, Math.min(80, startSize + delta * 0.3));
+      badge.style.fontSize = newSize + 'px';
+    }
   });
 }
 
@@ -1006,23 +1124,39 @@ async function exportPhoto() {
     const bh = badge.offsetHeight * sy;
 
     if (badge.id === 'badgeIcon') {
-      try {
-        const img = await svgBlobToImage(badge.innerHTML);
-        ctx.drawImage(img, bx, by, bw, bh);
-      } catch { /* skip if SVG fails */ }
+      const svgEl = badge.querySelector('svg');
+      if (svgEl) {
+        try {
+          const img = await svgBlobToImage(svgEl.outerHTML);
+          ctx.drawImage(img, bx, by, bw, bh);
+        } catch {}
+      }
       continue;
     }
 
-    const text = badge.textContent.trim();
-    const fs   = Math.round(15 * sx);
+    const text      = badge.textContent.trim();
+    const rawFs     = parseFloat(window.getComputedStyle(badge).fontSize);
+    const fs        = Math.round(rawFs * sx);
+    const color     = badge.dataset.color || '#ffffff';
+    const isBold    = badge.dataset.bold === '1' || badge.id === 'badgeTemp';
+    const isItalic  = badge.dataset.italic === '1';
+    const hasShadow = badge.dataset.shadow === '1';
+    const isDark    = color === '#000000';
+
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
     ctx.beginPath();
     ctx.roundRect(bx, by, bw, bh, 10 * sx);
     ctx.fill();
-    ctx.font         = `600 ${fs}px "PingFang TC","Microsoft JhengHei",sans-serif`;
-    ctx.fillStyle    = '#ffffff';
+    ctx.font         = `${isItalic ? 'italic ' : ''}${isBold ? '700' : '600'} ${fs}px "PingFang TC","Microsoft JhengHei",sans-serif`;
+    ctx.fillStyle    = color;
     ctx.textBaseline = 'middle';
+    if (hasShadow) {
+      ctx.shadowColor   = 'rgba(0,0,0,0.95)';
+      ctx.shadowBlur    = 4 * sx;
+      ctx.shadowOffsetX = 1 * sx;
+      ctx.shadowOffsetY = 1 * sx;
+    }
     ctx.fillText(text, bx + 12 * sx, by + bh / 2);
     ctx.restore();
   }

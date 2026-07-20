@@ -661,6 +661,98 @@ body {
   background: rgba(0,0,0,0.45);
 }
 
+/* 選取外框 */
+.badge.selected {
+  outline: 2px dashed rgba(255,255,255,0.8);
+  outline-offset: 2px;
+}
+
+/* 縮放手把（右下角） */
+.badge-handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 15px;
+  height: 15px;
+  background: #fff;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.35);
+  cursor: se-resize;
+  touch-action: none;
+  display: none;
+}
+.badge.selected .badge-handle { display: block; }
+
+/* ── Badge 格式工具列 ─────────────────────────────────────────────── */
+.badge-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(0,0,0,0.88);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.badge-toolbar-colors {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.badge-color-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.badge-color-btn.active {
+  border-color: #fff;
+  transform: scale(1.25);
+}
+
+.badge-color-custom {
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  position: relative;
+}
+.badge-color-custom input[type="color"] {
+  position: absolute;
+  width: 0; height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.badge-toolbar-fmts {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.badge-fmt-btn {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 11px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: background 0.15s;
+  outline: none;
+}
+.badge-fmt-btn:active { opacity: 0.7; }
+.badge-fmt-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ── 國際城市搜尋 ─────────────────────────────────────────────────── */
 .intl-search-wrap {
   position: relative;

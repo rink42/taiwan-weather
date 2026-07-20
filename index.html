@@ -126,6 +126,23 @@
         <div id="badgeTemp"     class="badge badge-temp"></div>
         <div id="badgeDesc"     class="badge"><span id="badgeDescText"></span></div>
       </div>
+      <div id="badgeToolbar" class="badge-toolbar hidden">
+        <div class="badge-toolbar-colors">
+          <button class="badge-color-btn" data-color="#ffffff" style="background:#fff" title="白"></button>
+          <button class="badge-color-btn" data-color="#ffff00" style="background:#ff0" title="黃"></button>
+          <button class="badge-color-btn" data-color="#00ffff" style="background:#0ff" title="青"></button>
+          <button class="badge-color-btn" data-color="#ff8c00" style="background:#f80" title="橘"></button>
+          <button class="badge-color-btn" data-color="#000000" style="background:#000;border-color:rgba(255,255,255,0.4)" title="黑"></button>
+          <label class="badge-color-custom" title="自訂顏色">
+            <input type="color" id="badgeColorPicker" value="#ffffff">🎨
+          </label>
+        </div>
+        <div class="badge-toolbar-fmts">
+          <button id="boldBtn"   class="badge-fmt-btn"><b>B</b></button>
+          <button id="italicBtn" class="badge-fmt-btn"><i>I</i></button>
+          <button id="shadowBtn" class="badge-fmt-btn">影</button>
+        </div>
+      </div>
       <div class="editor-bar">
         <button id="retakeBtn" class="cam-btn cam-close">🔄 重拍</button>
         <button id="exportBtn" class="cam-btn cam-shutter">💾 儲存圖片</button>
