@@ -753,6 +753,26 @@ body {
   border-color: var(--accent);
 }
 
+.badge-edit-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px 4px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.badge-edit-row.hidden { display: none; }
+.badge-edit-input {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  padding: 5px 8px;
+  outline: none;
+  min-width: 0;
+}
+.badge-edit-input:focus { border-color: var(--accent); }
+
 /* ── 國際城市搜尋 ─────────────────────────────────────────────────── */
 .intl-search-wrap {
   position: relative;

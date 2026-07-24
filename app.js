@@ -77,6 +77,7 @@ function deselectAll() {
   if (selectedBadge) selectedBadge.classList.remove('selected');
   selectedBadge = null;
   $('badgeToolbar').classList.add('hidden');
+  $('badgeEditRow').classList.add('hidden');
 }
 
 function syncToolbar(el) {
@@ -88,6 +89,8 @@ function syncToolbar(el) {
   $('boldBtn').classList.toggle('active',   el.dataset.bold   === '1');
   $('italicBtn').classList.toggle('active', el.dataset.italic === '1');
   $('shadowBtn').classList.toggle('active', el.dataset.shadow === '1');
+  $('editTextBtn').style.display = el.id === 'badgeIcon' ? 'none' : '';
+  if (el.id === 'badgeIcon') $('badgeEditRow').classList.add('hidden');
 }
 
 // 雙層描邊：白色內框（1px）+ 黑色外框（3px），任何背景都可見
@@ -322,6 +325,17 @@ function init() {
   $('boldBtn').addEventListener('click',   () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'bold'); });
   $('italicBtn').addEventListener('click', () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'italic'); });
   $('shadowBtn').addEventListener('click', () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'shadow'); });
+  $('editTextBtn').addEventListener('click', () => { if (selectedBadge) openBadgeEdit(selectedBadge); });
+  $('badgeEditConfirm').addEventListener('click', commitBadgeEdit);
+  $('badgeEditInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commitBadgeEdit(); } });
+  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => {
+    $(id).addEventListener('dblclick', e => {
+      if (id === 'badgeIcon') return;
+      e.stopPropagation();
+      selectBadge($(id));
+      openBadgeEdit($(id));
+    });
+  });
 
   if (API_KEY === 'YOUR_API_KEY') {
     apiKeyNotice.classList.remove('hidden');
@@ -1023,6 +1037,37 @@ function capturePhoto() {
   populateBadges();
   $('photoEditorModal').classList.remove('hidden');
   requestAnimationFrame(positionBadges);
+}
+
+function getBadgeEditText(badge) {
+  if (badge.id === 'badgeLocation') return $('badgeLocationText').textContent;
+  if (badge.id === 'badgeDesc')     return $('badgeDescText').textContent;
+  // badgeTemp: first text node (avoids including .badge-handle)
+  const tn = [...badge.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
+  return tn ? tn.nodeValue.trim() : badge.textContent.trim();
+}
+
+function setBadgeEditText(badge, text) {
+  if (!text.trim()) return;
+  if (badge.id === 'badgeLocation') { $('badgeLocationText').textContent = text; return; }
+  if (badge.id === 'badgeDesc')     { $('badgeDescText').textContent = text; return; }
+  // badgeTemp: replace or create first text node
+  const handle = badge.querySelector('.badge-handle');
+  const tn = [...badge.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
+  if (tn) tn.nodeValue = text;
+  else badge.insertBefore(document.createTextNode(text), handle || null);
+}
+
+function openBadgeEdit(badge) {
+  const input = $('badgeEditInput');
+  input.value = getBadgeEditText(badge);
+  $('badgeEditRow').classList.remove('hidden');
+  requestAnimationFrame(() => { input.focus(); input.select(); });
+}
+
+function commitBadgeEdit() {
+  if (selectedBadge) setBadgeEditText(selectedBadge, $('badgeEditInput').value);
+  $('badgeEditRow').classList.add('hidden');
 }
 
 function loadAlbumPhoto() {
