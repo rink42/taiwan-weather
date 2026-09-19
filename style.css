@@ -568,6 +568,7 @@ body {
   flex-direction: column;
   align-items: center;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .camera-view,
@@ -597,6 +598,9 @@ body {
   background: rgba(0,0,0,0.75);
   gap: 12px;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
 }
 
 .cam-btn {
