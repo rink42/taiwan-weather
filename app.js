@@ -310,7 +310,7 @@ function init() {
   });
 
   // 點底圖空白處取消選取
-  $('photoContainer').addEventListener('pointerdown', e => {
+  $('canvasWrap').addEventListener('pointerdown', e => {
     if (!e.target.closest('.badge')) deselectAll();
   });
 
@@ -1112,14 +1112,14 @@ function populateBadges() {
 }
 
 function positionBadges() {
-  const c = $('photoContainer');
+  const c = $('canvasWrap');
   const w = c.offsetWidth;
   const h = c.offsetHeight;
   [
-    ['badgeLocation', 0.05, 0.06],
-    ['badgeIcon',     0.68, 0.05],
-    ['badgeTemp',     0.05, 0.76],
-    ['badgeDesc',     0.50, 0.76],
+    ['badgeLocation', 0.02, 0.04],
+    ['badgeIcon',     0.55, 0.04],
+    ['badgeTemp',     0.02, 0.24],
+    ['badgeDesc',     0.42, 0.24],
   ].forEach(([id, rx, ry]) => {
     const el = $(id);
     el.style.left = Math.round(rx * w) + 'px';
@@ -1139,7 +1139,7 @@ function makeDraggable(el) {
   });
   el.addEventListener('pointermove', e => {
     if (!(e.buttons & 1)) return;
-    const cont = $('photoContainer');
+    const cont = $('canvasWrap');
     const maxL = cont.offsetWidth  - el.offsetWidth;
     const maxT = cont.offsetHeight - el.offsetHeight;
     el.style.left = Math.max(0, Math.min(maxL, oleft + e.clientX - ox)) + 'px';
@@ -1195,7 +1195,7 @@ function svgBlobToImage(svgStr) {
 
 async function exportPhoto() {
   const src  = $('photoCanvas');
-  const cont = $('photoContainer');
+  const cont = $('canvasWrap');
   const out  = document.createElement('canvas');
   out.width  = src.width;
   out.height = src.height;

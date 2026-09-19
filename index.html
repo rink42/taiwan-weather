@@ -124,11 +124,13 @@
   <div id="photoEditorModal" class="modal-overlay hidden">
     <div class="photo-editor">
       <div id="photoContainer" class="photo-container">
-        <canvas id="photoCanvas"></canvas>
-        <div id="badgeLocation" class="badge">📍 <span id="badgeLocationText"></span></div>
-        <div id="badgeIcon"     class="badge badge-icon"></div>
-        <div id="badgeTemp"     class="badge badge-temp"></div>
-        <div id="badgeDesc"     class="badge"><span id="badgeDescText"></span></div>
+        <div id="canvasWrap" class="canvas-wrap">
+          <canvas id="photoCanvas"></canvas>
+          <div id="badgeLocation" class="badge">📍 <span id="badgeLocationText"></span></div>
+          <div id="badgeIcon"     class="badge badge-icon"></div>
+          <div id="badgeTemp"     class="badge badge-temp"></div>
+          <div id="badgeDesc"     class="badge"><span id="badgeDescText"></span></div>
+        </div>
       </div>
       <div id="badgeToolbar" class="badge-toolbar hidden">
         <div class="badge-toolbar-colors">
