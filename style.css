@@ -64,6 +64,13 @@ body {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+.logo small {
+  font-size: 0.6rem;
+  font-weight: 400;
+  opacity: 0.45;
+  vertical-align: middle;
+  letter-spacing: 0;
+}
 
 .header-controls {
   display: flex;

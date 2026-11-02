@@ -4,6 +4,7 @@ const API_KEY = 'CWA-DB0FD5AA-748A-401C-8ED2-AB6312E8FEAD';
 // ─────────────────────────────────────────────────────────────────────
 
 const API_BASE = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore';
+const APP_VER  = 'v43';
 
 // 各縣市對應的鄉鎮市區天氣預報 dataset ID（每 4 個 ID 一組，取第一個有效 ID）
 const COUNTY_DATASET = {
@@ -231,6 +232,7 @@ const hourlyTitle    = $('hourlyTitle');
 
 // ── Init ─────────────────────────────────────────────────────────────
 function init() {
+  $('appVer').textContent = ' ' + APP_VER;
   COUNTIES.forEach(name => {
     const opt = document.createElement('option');
     opt.value = name;
