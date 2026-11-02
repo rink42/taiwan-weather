@@ -86,6 +86,10 @@ function syncToolbar(el) {
     btn.classList.toggle('active', btn.dataset.color === color)
   );
   $('badgeColorPicker').value = color;
+  const bg = el.dataset.bg || 'none';
+  $('badgeToolbar').querySelectorAll('.badge-bg-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.bg === bg)
+  );
   $('boldBtn').classList.toggle('active',   el.dataset.bold   === '1');
   $('italicBtn').classList.toggle('active', el.dataset.italic === '1');
   $('shadowBtn').classList.toggle('active', el.dataset.shadow === '1');
@@ -113,9 +117,13 @@ function applyOutlineStyle(el) {
 function applyBadgeColor(el, color) {
   el.dataset.color = color;
   el.style.color   = color;
-  const isDark = color === '#000000';
-  el.style.background = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
-  applyOutlineStyle(el);  // 顏色改變時同步更新外框
+  applyOutlineStyle(el);
+  syncToolbar(el);
+}
+
+function applyBadgeBg(el, bg) {
+  el.dataset.bg      = bg;
+  el.style.background = bg === 'none' ? 'transparent' : bg;
   syncToolbar(el);
 }
 
@@ -136,10 +144,10 @@ function applyBadgeFmt(el, fmt) {
 
 function resetBadgeStyle(el) {
   el.dataset.color = '#ffffff'; el.dataset.bold = '0';
-  el.dataset.italic = '0';      el.dataset.shadow = '0';
+  el.dataset.italic = '0';      el.dataset.shadow = '0'; el.dataset.bg = 'none';
   el.style.cssText = el.style.cssText; // keep position; reset only format below
   el.style.color = ''; el.style.fontWeight = ''; el.style.fontStyle = '';
-  el.style.textShadow = ''; el.style.background = ''; el.style.fontSize = '';
+  el.style.textShadow = ''; el.style.background = 'transparent'; el.style.fontSize = '';
 }
 
 // ── State ────────────────────────────────────────────────────────────
@@ -304,7 +312,7 @@ function init() {
     openCamera();
   });
   $('exportBtn').addEventListener('click', exportPhoto);
-  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => {
+  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc', 'badgeDate', 'badgeTime'].forEach(id => {
     makeDraggable($(id));
     makeResizable($(id));
   });
@@ -322,13 +330,20 @@ function init() {
     if (selectedBadge) applyBadgeColor(selectedBadge, $('badgeColorPicker').value);
   });
   $('badgeColorPicker').parentElement.addEventListener('click', () => $('badgeColorPicker').click());
+  $('badgeToolbar').querySelectorAll('.badge-bg-btn').forEach(btn => {
+    btn.addEventListener('click', () => { if (selectedBadge) applyBadgeBg(selectedBadge, btn.dataset.bg); });
+  });
+  $('badgeBgPicker').addEventListener('input', () => {
+    if (selectedBadge) applyBadgeBg(selectedBadge, $('badgeBgPicker').value);
+  });
+  $('badgeBgPicker').parentElement.addEventListener('click', () => $('badgeBgPicker').click());
   $('boldBtn').addEventListener('click',   () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'bold'); });
   $('italicBtn').addEventListener('click', () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'italic'); });
   $('shadowBtn').addEventListener('click', () => { if (selectedBadge) applyBadgeFmt(selectedBadge, 'shadow'); });
   $('editTextBtn').addEventListener('click', () => { if (selectedBadge) openBadgeEdit(selectedBadge); });
   $('badgeEditConfirm').addEventListener('click', commitBadgeEdit);
   $('badgeEditInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commitBadgeEdit(); } });
-  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => {
+  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc', 'badgeDate', 'badgeTime'].forEach(id => {
     $(id).addEventListener('dblclick', e => {
       if (id === 'badgeIcon') return;
       e.stopPropagation();
@@ -1042,7 +1057,8 @@ function capturePhoto() {
 function getBadgeEditText(badge) {
   if (badge.id === 'badgeLocation') return $('badgeLocationText').textContent;
   if (badge.id === 'badgeDesc')     return $('badgeDescText').textContent;
-  // badgeTemp: first text node (avoids including .badge-handle)
+  if (badge.id === 'badgeDate')     return $('badgeDateText').textContent;
+  if (badge.id === 'badgeTime')     return $('badgeTimeText').textContent;
   const tn = [...badge.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
   return tn ? tn.nodeValue.trim() : badge.textContent.trim();
 }
@@ -1051,6 +1067,8 @@ function setBadgeEditText(badge, text) {
   if (!text.trim()) return;
   if (badge.id === 'badgeLocation') { $('badgeLocationText').textContent = text; return; }
   if (badge.id === 'badgeDesc')     { $('badgeDescText').textContent = text; return; }
+  if (badge.id === 'badgeDate')     { $('badgeDateText').textContent = text; return; }
+  if (badge.id === 'badgeTime')     { $('badgeTimeText').textContent = text; return; }
   // badgeTemp: replace or create first text node
   const handle = badge.querySelector('.badge-handle');
   const tn = [...badge.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
@@ -1095,7 +1113,7 @@ function loadAlbumPhoto() {
 }
 
 function populateBadges() {
-  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc'].forEach(id => resetBadgeStyle($(id)));
+  ['badgeLocation', 'badgeIcon', 'badgeTemp', 'badgeDesc', 'badgeDate', 'badgeTime'].forEach(id => resetBadgeStyle($(id)));
   const slot = findCurrentSlot(allHourly);
   let locationText;
   if (lastIntlLocation) {
@@ -1109,6 +1127,9 @@ function populateBadges() {
   $('badgeIcon').innerHTML = wi(slot.wx, 52);
   $('badgeTemp').textContent = (slot.t !== '—' ? slot.t : '?') + '°C';
   $('badgeDescText').textContent = slot.wx;
+  const now = new Date();
+  $('badgeDateText').textContent = now.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  $('badgeTimeText').textContent = now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function positionBadges() {
@@ -1120,6 +1141,8 @@ function positionBadges() {
     ['badgeIcon',     0.55, 0.04],
     ['badgeTemp',     0.02, 0.24],
     ['badgeDesc',     0.42, 0.24],
+    ['badgeDate',     0.02, 0.82],
+    ['badgeTime',     0.60, 0.82],
   ].forEach(([id, rx, ry]) => {
     const el = $(id);
     el.style.left = Math.round(rx * w) + 'px';
@@ -1229,13 +1252,15 @@ async function exportPhoto() {
     const isBold    = badge.dataset.bold === '1' || badge.id === 'badgeTemp';
     const isItalic  = badge.dataset.italic === '1';
     const hasShadow = badge.dataset.shadow === '1';
-    const isDark    = color === '#000000';
+    const bg        = badge.dataset.bg || 'none';
 
     ctx.save();
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
-    ctx.beginPath();
-    ctx.roundRect(bx, by, bw, bh, 10 * sx);
-    ctx.fill();
+    if (bg !== 'none') {
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 10 * sx);
+      ctx.fill();
+    }
     ctx.font         = `${isItalic ? 'italic ' : ''}${isBold ? '700' : '600'} ${fs}px "PingFang TC","Microsoft JhengHei",sans-serif`;
     ctx.fillStyle    = color;
     ctx.textBaseline = 'middle';
